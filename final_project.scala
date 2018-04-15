@@ -10,7 +10,7 @@
 
 
 abstract class Value {
-  
+
 
    // TYPE: removed predicates for checking types (all done statically now)
 
@@ -19,6 +19,92 @@ abstract class Value {
    def getBool () : Boolean = false
    def getList () : List[Value] = List()
    def apply (args: List[Value]) : Value = new VInteger(0)
+
+   def isInteger () : Boolean = false
+   def isBoolean () : Boolean = false
+   def isVector () : Boolean = false
+   def isFunction () : Boolean = false
+   def isRefCell () : Boolean = false
+   def isNone () : Boolean = false
+   def isObject () : Boolean = false
+
+   def error (msg : String) : Nothing = {
+      throw new Exception("Value error: "+ msg + "\n   in value " + this)
+   }
+
+  //  def getInt () : Int = {
+  //     error("Value not of type INTEGER")
+  //  }
+   //
+  //  def getBool () : Boolean = {
+  //     error("Value not of type BOOLEAN")
+  //  }
+   //
+  //  def getList () : List[Value] = {
+  //     error("Value not of type VECTOR")
+  //  }
+   //
+  //  def apply (args: List[Value]) : Value =  {
+  //     error("Value not of type FUNCTION")
+  //  }
+
+   def getRefContent () : Value = {
+      error("Value not of type REFCELL")
+   }
+
+   def setRefContent (v:Value) : Unit = {
+      error("Value not of type REFCELL")
+   }
+
+   def lookupField (s:String) : Value = {
+      error("Value not of type OBJECT")
+   }
+
+   def lookupMethod (s:String) : Value = {
+      error("Value not of type OBJECT")
+   }
+
+   def checkInteger () : Unit = {
+     if (!isInteger()) {
+        error("Value not of type INTEGER")
+     }
+   }
+
+   def checkBoolean () : Unit = {
+     if (!isBoolean()) {
+        error("Value not of type BOOLEAN")
+     }
+   }
+
+   def checkVector () : Unit = {
+     if (!isVector()) {
+        error("Value not of type VECTOR")
+     }
+   }
+
+   def checkFunction () : Unit = {
+     if (!isFunction()) {
+        error("Value not of type FUNCTION")
+     }
+   }
+
+   def checkRefCell () : Unit = {
+     if (!isRefCell()) {
+        error("Value not of type REFCELL")
+     }
+   }
+
+   def checkUnit () : Unit = {
+     if (!isNone()) {
+        error("Value not of type NONE")
+     }
+   }
+
+   def checkObject () : Unit = {
+     if (!isObject()) {
+        error("Value not of type OBJECT")
+     }
+   }
 }
 
 
@@ -303,8 +389,10 @@ abstract class Exp {
 
     def typeCheck (t:Type, symt:Env[Type]) : Boolean = {
     	val t2 = this.typeOf(symt)
-	return t.isSame(t2)
+      return t.isSame(t2)
     }
+
+    // def classOf(classt:Env[])
 }
 
 
@@ -555,12 +643,15 @@ class EObject (val fields: List[(String,Exp)], val methods:List[(String,Exp)]) e
    override def toString () : String =
      "EObject(" + fields + "," + methods + ")"
 
-   def eval (env : Env) : Value = {
+   def eval (env : Env[Value]) : Value = {
      val fields_val = fields.map((p) => (p._1,p._2.eval(env)))
      // wrap every method with as function expecting "this" as an argument
      val meths_val = methods.map((p) => (p._1,new VRecClosure("",List("this"),p._2,env)))
      return new VObject(fields_val,meths_val)
    }
+
+   def typeOf (symt:Env[Type]) : Type = TObject
+
 }
 
 class EField (val r:Exp, val f:String) extends Exp {
@@ -568,10 +659,15 @@ class EField (val r:Exp, val f:String) extends Exp {
   override def toString () : String =
      "EField(" + r + "," + f + ")"
 
-  def eval (env : Env) : Value = {
+  def eval (env : Env[Value]) : Value = {
     val vr = r.eval(env)
     return vr.lookupField(f)
   }
+
+  def typeOf (symt:Env[Type]) : Type = {
+    return r.typeOf(symt)
+  }
+
 }
 
 
@@ -580,10 +676,14 @@ class EMethod (val r:Exp, val f:String) extends Exp {
   override def toString () : String =
      "EMethod(" + r + "," + f + ")"
 
-  def eval (env : Env) : Value = {
+  def eval (env : Env[Value]) : Value = {
     val vr = r.eval(env)
     val m = vr.lookupMethod(f)
     return m.apply(List(vr))
+  }
+
+  def typeOf(symt:Env[Type]) : Type = {
+    return r.typeOf(symt)
   }
 }
 
@@ -651,16 +751,16 @@ class SExpParser extends RegexParsers {
    def expr_vec : Parser[Exp] =
       LB ~ rep(expr) ~ RB ^^ { case _ ~ es ~ _ => new EVector(es) }
 
-   def mkClass (name:String, params:List[String], fields:List[(String,Exp)], meths:List[(String,Exp)]) : Exp = {
-        return new ERecFunction(name,params,new EObject(fields,meths))
+   def mkClass (name:String, params:List[String], ty: Type, fields:List[(String,Exp)], meths:List[(String,Exp)]) : Exp = {
+        return new ERecFunction(name,params, ty, new EObject(fields,meths))
       }
 
       def meth_binding : Parser[(String,Exp)] =
-         LP ~ ID ~ LP ~ rep(ID) ~ RP ~ expr ~ RP ^^ { case _ ~ name ~ _ ~ params ~ _ ~ body ~ _ => (name, new EFunction(params,body)) }
+         LP ~ ID ~ LP ~ rep(ID) ~ RP ~ typ ~ expr ~ RP ^^ { case _ ~ name ~ _ ~ params ~ _ ~ typ  ~ body ~ _ => (name, new EFunction(params, typ, body)) }
 
       def expr_class : Parser[Exp] =
-        LP ~ CLASS ~ ID ~ LP ~ rep(ID) ~ RP ~ LP ~ FIELDS ~ rep(binding) ~ RP ~ LP ~ METHODS ~ rep(meth_binding) ~ RP ~ RP ^^
-           { case _ ~ _ ~ rec ~ _ ~ params ~ _ ~ _ ~ _ ~ fields ~ _ ~ _ ~ _ ~ meths ~ _ ~ _ => mkClass(rec,params,fields,meths) }
+        LP ~ CLASS ~ ID ~ LP ~ rep(ID) ~ RP ~ LP ~ FIELDS ~ rep(binding) ~ RP ~ typ ~ LP ~ METHODS ~ rep(meth_binding) ~ RP ~ RP ^^
+           { case _ ~ _ ~ rec ~ _ ~ params ~ _ ~ _ ~ _ ~ fields ~ _ ~ typ ~ _ ~ _ ~ meths ~ _ ~ _ => mkClass(rec,params,typ,fields,meths) }
 
       def expr_field : Parser[Exp] =
         LP ~ FIELD ~ expr ~ ID ~ RP ^^ { case _ ~ _ ~ e ~ id ~ _ => new EField(e,id) }
