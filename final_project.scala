@@ -265,6 +265,7 @@ abstract class Type {
    def isBoolean () : Boolean = return false
    def isIntVector () : Boolean = return false
    def isFunction () : Boolean = return false
+   def isObject () : Boolean = return false
 
    def funParams () : List[Type] = {
       throw new Exception("Type error: type is not a function\n   "+this)
@@ -299,6 +300,15 @@ object TIntVector extends Type {
 
    def isSame (t:Type):Boolean = return t.isIntVector()
    override def isIntVector () : Boolean = true
+}
+
+class TObject (val className:String) extends Type {
+
+   override def toString () : String = "(object " + className + ")"
+   def isSame (t:Type):Boolean = return t.isObject()
+   override def isObject () : Boolean = true
+   override def getClass () : String = return className
+
 }
 
 class TFunction (val params:List[Type], val result:Type) extends Type {
