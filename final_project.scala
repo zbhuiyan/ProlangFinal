@@ -302,12 +302,12 @@ object TIntVector extends Type {
    override def isIntVector () : Boolean = true
 }
 
-class TObject (val className:String) extends Type {
+class TObject (val class_name:String) extends Type {
 
-   override def toString () : String = "(object " + className + ")"
+   override def toString () : String = "(object " + class_name + ")"
    def isSame (t:Type):Boolean = return t.isObject()
    override def isObject () : Boolean = true
-   override def getClass () : String = return className
+   def getClass () : String = return class_name
 
 }
 
@@ -402,7 +402,8 @@ abstract class Exp {
       return t.isSame(t2)
     }
 
-    // def classOf(classt:Env[])
+    // def classOf(classt:Env[]) :
+
 }
 
 
@@ -648,7 +649,7 @@ class VObject (val fields: List[(String,Value)], val methods:List[(String,Value)
   }
 }
 
-class EObject (val fields: List[(String,Exp)], val methods:List[(String,Exp)]) extends Exp {
+class EObject (val class_name: String, val fields: List[(String,Exp)], val methods:List[(String,Exp)]) extends Exp {
 
    override def toString () : String =
      "EObject(" + fields + "," + methods + ")"
@@ -660,7 +661,8 @@ class EObject (val fields: List[(String,Exp)], val methods:List[(String,Exp)]) e
      return new VObject(fields_val,meths_val)
    }
 
-   def typeOf (symt:Env[Type]) : Type = TObject
+   def typeOf (symt:Env[Type]) : Type =
+     new TObject(class_name)
 
 }
 
@@ -762,7 +764,7 @@ class SExpParser extends RegexParsers {
       LB ~ rep(expr) ~ RB ^^ { case _ ~ es ~ _ => new EVector(es) }
 
    def mkClass (name:String, params:List[String], ty: Type, fields:List[(String,Exp)], meths:List[(String,Exp)]) : Exp = {
-        return new ERecFunction(name,params, ty, new EObject(fields,meths))
+        return new ERecFunction(name,params, ty, new EObject(name, fields,meths))
       }
 
       def meth_binding : Parser[(String,Exp)] =
@@ -816,6 +818,7 @@ class SExpParser extends RegexParsers {
 
    def shell_entry : Parser[ShellEntry] =
       (LP ~ "define" ~ ID ~ expr ~ RP  ^^ { case _ ~ _ ~ n ~ e ~ _  => new SEdefine(n,e) }) |
+      (LP ~ "class" ~ ID ~ rep(binding) ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ fields ~ methods ~ _ => new SEClass(id, fields, methods)})
       (expr ^^ { e => new SEexpr(e) }) |
       ("#quit" ^^ { s => new SEquit() })
 
@@ -833,7 +836,7 @@ abstract class ShellEntry {
    // (representing the various entries you
    //  can type at the shell)
 
-   def processEntry (env:Env[Value],symt:Env[Type]) : (Env[Value],Env[Type])
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type])
 }
 
 
@@ -843,7 +846,7 @@ abstract class ShellEntry {
 
 class SEexpr (e:Exp) extends ShellEntry {
 
-   def processEntry (env:Env[Value],symt:Env[Type]) : (Env[Value],Env[Type]) = {
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type]) = {
       val t = e.typeOf(symt)
       val v = e.eval(env)
       println(v+" : "+t)
@@ -858,7 +861,7 @@ class SEexpr (e:Exp) extends ShellEntry {
 
 class SEdefine (n:String, e:Exp) extends ShellEntry {
 
-   def processEntry (env:Env[Value],symt:Env[Type]) : (Env[Value],Env[Type]) = {
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type]) = {
       val t = e.typeOf(symt)
       val v = e.eval(env)
       println(n + " defined with type " + t)
@@ -867,9 +870,38 @@ class SEdefine (n:String, e:Exp) extends ShellEntry {
 
 }
 
+class SEClass (name:String, fields:List[(String, Exp)], methods:List[(String, Exp)]) extends ShellEntry {
+
+// // version 1
+   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
+      var newClasst = classt
+      newClasst.push(name, (fields, methods))
+      return (env,symt, newClasst)
+   }
+
+  //  def processEntry (env:Env[Value], symt:Env[Type]): (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
+  //     var classt = new Env[(List[(String,Exp)], List[(String,Exp)])]()
+  //     classt.push(name, (fields, methods))
+  //     return (env,symt, classt)
+   //
+  //     // (content: List[(String, (List[(String, Exp)], List[(String, Exp)]))])
+  //  }
+
+}
+
+// class Env[A] (val content: List[(String, A)]) {
+//
+//       // push a single binding (id,v) on top of the environment
+//
+//       def push (id : String, v : A) : Env[A] =
+//           new Env[A]((id,v)::content)
+
+
+
+
 class SEquit extends ShellEntry {
 
-   def processEntry (env:Env[Value],symt:Env[Type]) : (Env[Value],Env[Type]) = {
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type]) = {
 
       System.exit(0)
       return (env,symt)
@@ -933,19 +965,23 @@ object Shell {
      ("cons",new TFunction(List(TInteger,TIntVector),TIntVector))
    ))
 
+   val stdClasst = new Env[(List[(String,Exp)], List[(String,Exp)])]("asdf", List(("asdf", new VVector(List())), List(("asdf", new VVector(List())))))
+
    def shell () : Unit = {
 
        var env = stdEnv
        var symt = stdSymt
+       var classt = stdClasst
 
        while (true) {
           print("TFUNC> ")
           try {
              val input = scala.io.StdIn.readLine()
              val se = parse(input)
-	     val result = se.processEntry(env,symt)
+	     val result = se.processEntry(env,symt,classt)
 	     env = result._1
 	     symt = result._2
+      //  classt = result._3
           } catch {
              case e : Exception => println(e.getMessage)
           }
