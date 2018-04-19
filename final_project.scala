@@ -266,6 +266,7 @@ abstract class Type {
    def isIntVector () : Boolean = return false
    def isFunction () : Boolean = return false
    def isObject () : Boolean = return false
+  //  def getClass (): String = return " "
 
    def funParams () : List[Type] = {
       throw new Exception("Type error: type is not a function\n   "+this)
@@ -307,7 +308,7 @@ class TObject (val class_name:String) extends Type {
    override def toString () : String = "(object " + class_name + ")"
    def isSame (t:Type):Boolean = return t.isObject()
    override def isObject () : Boolean = true
-   def getClass () : String = return class_name
+  //  override def getClass () : String = return class_name
 
 }
 
@@ -465,21 +466,21 @@ class EIf (val ec : Exp, val et : Exp, val ee : Exp) extends Exp {
 
     def eval (env:Env[Value]) : Value = {
         val ev = ec.eval(env)
-	if (!ev.getBool()) {
-  	  return ee.eval(env)
-	} else {
-	  return et.eval(env)
-	}
+      	if (!ev.getBool()) {
+        	  return ee.eval(env)
+      	} else {
+      	  return et.eval(env)
+      	}
     }
 
     def typeOf (symt:Env[Type]) : Type = {
       if (ec.typeCheck(TBoolean,symt)) {
         val t = et.typeOf(symt)
-	if (ee.typeCheck(t,symt)) {
-	  return t
-	} else {
-	  terror("Branches of conditional have different types")
-	}
+    	if (ee.typeCheck(t,symt)) {
+    	  return t
+    	} else {
+    	  terror("Branches of conditional have different types")
+    	}
       } else {
         terror("Condition should be Boolean")
       }
@@ -666,6 +667,27 @@ class EObject (val class_name: String, val fields: List[(String,Exp)], val metho
 
 }
 
+class EObjectFromClass (val class_name: String, val fields: List[(String,Exp)], val methods:List[(String,Exp)]) extends Exp {
+
+   override def toString () : String =
+     "EObject(" + fields + "," + methods + ")"
+
+   def eval (env : Env[Value]) : Value = {
+     val fields_val = fields.map((p) => (p._1,p._2.eval(env)))
+     // wrap every method with as function expecting "this" as an argument
+     val meths_val = methods.map((p) => (p._1,new VRecClosure("",List("this"),p._2,env)))
+     return new VObject(fields_val,meths_val)
+   }
+
+   def typeOf (symt:Env[Type]) : Type =
+     new TObject(class_name)
+
+}
+
+
+
+// def lookup_class(name:String, classt:Env[(List(String, Exp),List(String, Exp))]) :
+
 class EField (val r:Exp, val f:String) extends Exp {
 
   override def toString () : String =
@@ -824,6 +846,7 @@ class SExpParser extends RegexParsers {
 
 }
 
+// (class A (S S) (D D))
 
 
 //
@@ -836,7 +859,7 @@ abstract class ShellEntry {
    // (representing the various entries you
    //  can type at the shell)
 
-   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type])
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[(String,Exp)], List[(String,Exp)])])
 }
 
 
@@ -846,11 +869,11 @@ abstract class ShellEntry {
 
 class SEexpr (e:Exp) extends ShellEntry {
 
-   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type]) = {
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[(String,Exp)], List[(String,Exp)])]) = {
       val t = e.typeOf(symt)
       val v = e.eval(env)
       println(v+" : "+t)
-      return (env,symt)
+      return (env,symt,classt)
    }
 }
 
@@ -861,11 +884,11 @@ class SEexpr (e:Exp) extends ShellEntry {
 
 class SEdefine (n:String, e:Exp) extends ShellEntry {
 
-   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type]) = {
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[(String,Exp)], List[(String,Exp)])]) = {
       val t = e.typeOf(symt)
       val v = e.eval(env)
       println(n + " defined with type " + t)
-      return (env.push(n,v),symt.push(n,t))
+      return (env.push(n,v),symt.push(n,t),classt)
    }
 
 }
@@ -875,36 +898,19 @@ class SEClass (name:String, fields:List[(String, Exp)], methods:List[(String, Ex
 // // version 1
    def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
       var newClasst = classt
-      newClasst.push(name, (fields, methods))
+      newClasst = newClasst.push(name, (fields, methods))
       return (env,symt, newClasst)
    }
 
-  //  def processEntry (env:Env[Value], symt:Env[Type]): (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
-  //     var classt = new Env[(List[(String,Exp)], List[(String,Exp)])]()
-  //     classt.push(name, (fields, methods))
-  //     return (env,symt, classt)
-   //
-  //     // (content: List[(String, (List[(String, Exp)], List[(String, Exp)]))])
-  //  }
-
 }
-
-// class Env[A] (val content: List[(String, A)]) {
-//
-//       // push a single binding (id,v) on top of the environment
-//
-//       def push (id : String, v : A) : Env[A] =
-//           new Env[A]((id,v)::content)
-
-
 
 
 class SEquit extends ShellEntry {
 
-   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type]) = {
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[(String,Exp)], List[(String,Exp)])]) = {
 
       System.exit(0)
-      return (env,symt)
+      return (env,symt,classt)
    }
 }
 
@@ -944,6 +950,7 @@ object Shell {
      ("cons",new VPrimOp(Ops.operCons)),
    ))
 
+
    // TYPE: the initial symbol table, recording the types
    //       of all top-level functions to allow for
    //       type-checking their use.
@@ -965,7 +972,7 @@ object Shell {
      ("cons",new TFunction(List(TInteger,TIntVector),TIntVector))
    ))
 
-   val stdClasst = new Env[(List[(String,Exp)], List[(String,Exp)])]("asdf", List(("asdf", new VVector(List())), List(("asdf", new VVector(List())))))
+  val stdClasst = new Env[(List[(String,Exp)], List[(String,Exp)])](List())
 
    def shell () : Unit = {
 
@@ -981,7 +988,8 @@ object Shell {
 	     val result = se.processEntry(env,symt,classt)
 	     env = result._1
 	     symt = result._2
-      //  classt = result._3
+       classt = result._3
+       println("Classes: " + classt)
           } catch {
              case e : Exception => println(e.getMessage)
           }
