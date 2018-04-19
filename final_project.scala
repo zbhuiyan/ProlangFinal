@@ -667,24 +667,6 @@ class EObject (val class_name: String, val fields: List[(String,Exp)], val metho
 
 }
 
-class EObjectFromClass (val class_name: String, val fields: List[(String,Exp)], val methods:List[(String,Exp)]) extends Exp {
-
-   override def toString () : String =
-     "EObject(" + fields + "," + methods + ")"
-
-   def eval (env : Env[Value]) : Value = {
-     val fields_val = fields.map((p) => (p._1,p._2.eval(env)))
-     // wrap every method with as function expecting "this" as an argument
-     val meths_val = methods.map((p) => (p._1,new VRecClosure("",List("this"),p._2,env)))
-     return new VObject(fields_val,meths_val)
-   }
-
-   def typeOf (symt:Env[Type]) : Type =
-     new TObject(class_name)
-
-}
-
-
 
 // def lookup_class(name:String, classt:Env[(List(String, Exp),List(String, Exp))]) :
 
