@@ -823,6 +823,7 @@ class SExpParser extends RegexParsers {
    def shell_entry : Parser[ShellEntry] =
       (LP ~ "define" ~ ID ~ expr ~ RP  ^^ { case _ ~ _ ~ n ~ e ~ _  => new SEdefine(n,e) }) |
       (LP ~ "class" ~ ID ~ rep(binding) ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ fields ~ methods ~ _ => new SEClass(id, fields, methods)})
+      (LP ~ "class" ~ ID ~ "extends" ~ ID ~ rep(binding) ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ id2 ~ fields ~ methods ~ _ => new SEClassInherit(id, id2, sfields, methods)})
       (expr ^^ { e => new SEexpr(e) }) |
       ("#quit" ^^ { s => new SEquit() })
 
