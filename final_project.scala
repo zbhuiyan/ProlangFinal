@@ -371,11 +371,20 @@ class Env[A] (val content: List[(String, A)]) {
 
       def lookup (id : String) : A = {
       	  for (entry <- content) {
-	      if (entry._1 == id) {
-	      	 return entry._2
-	      }
-	  }
-	  throw new Exception("Environment error: unbound identifier "+id)
+  	      if (entry._1 == id) {
+  	      	 return entry._2
+  	      }
+	       }
+	        throw new Exception("Environment error: unbound identifier "+id)
+      }
+
+      def contains(id: String) : Boolean = {
+        for (entry <- content) {
+          if (entry._1 == id) {
+             return true
+          }
+        }
+        return false
       }
 }
 
@@ -822,14 +831,12 @@ class SExpParser extends RegexParsers {
 
    def shell_entry : Parser[ShellEntry] =
       (LP ~ "define" ~ ID ~ expr ~ RP  ^^ { case _ ~ _ ~ n ~ e ~ _  => new SEdefine(n,e) }) |
-      (LP ~ "class" ~ ID ~ rep(binding) ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ fields ~ methods ~ _ => new SEClass(id, fields, methods)})
-      (LP ~ "class" ~ ID ~ "extends" ~ ID ~ rep(binding) ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ id2 ~ fields ~ methods ~ _ => new SEClassInherit(id, id2, sfields, methods)})
+      (LP ~ "class" ~ ID ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ fields ~ _ ~ methods ~ _ => new SEClass(id, fields, methods)}) |
+      (LP ~ "class" ~ ID ~ "inherits" ~ ID ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ id2 ~ fields ~ _ ~ methods ~ _ => new SEClassInherit(id, id2, fields, methods)}) |
       (expr ^^ { e => new SEexpr(e) }) |
       ("#quit" ^^ { s => new SEquit() })
 
 }
-
-// (class A (S S) (D D))
 
 
 //
@@ -880,29 +887,45 @@ class SEClass (name:String, fields:List[(String, Exp)], methods:List[(String, Ex
 
    def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
       var newClasst = classt
-      newClasst = newClasst.push(name, (fields, methods))
+      if (classt.contains(name)) {
+        throw new Exception("class " + name + " already exists.")
+      } else {
+        newClasst = newClasst.push(name, (fields, methods))
+      }
       return (env,symt, newClasst)
    }
 
 }
 
+// try these two examples
+// (class A (S S) (K K), (D D))
+// (class B inherits A (S B) (B B), (L L))
+
 class SEClassInherit (name:String, name_parent:String, fields:List[(String, Exp)], methods:List[(String, Exp)]) extends ShellEntry {
 
    def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
       var newClasst = classt
-      val value = classt.lookup(name_parent)
+      var value = (List[(String,Exp)](), List[(String,Exp)]())
+      try {
+        value = classt.lookup(name_parent)
+      } catch {
+        case e: Exception => throw new Exception("Parent class doesn't exist.")
+      }
+
       val fields_parent = value._1
       val methods_parent = value._2
       var new_fields = List[(String, Exp)]()
       for ((s_child, e_child) <- fields) {
         for ((s_parent, e_parent) <- fields_parent) {
           //inherit
-          if (s_child != s_parent) {
-            new_fields :+ (s_parent, e_parent)
+          if (s_child != s_parent && ! new_fields.contains((s_parent, e_parent))) {
+            println("pushing " + (s_parent, e_parent))
+            new_fields = (s_parent, e_parent) :: new_fields
           }
         }
+
         //push in everything that's in the child
-        new_fields :+ (s_child, e_child)
+        new_fields = (s_child, e_child) :: new_fields
       }
 
       var new_methods = List[(String, Exp)]()
@@ -910,11 +933,11 @@ class SEClassInherit (name:String, name_parent:String, fields:List[(String, Exp)
         for ((s_parent, e_parent) <- methods_parent) {
           //inherit
           if (s_child != s_parent) {
-            new_methods :+ (s_parent, e_parent)
+            new_methods = new_methods :+ (s_parent, e_parent)
           }
         }
         //push in everything that's in the child
-        new_methods :+ (s_child, e_child)
+        new_methods = new_methods :+ (s_child, e_child)
       }
 
       newClasst = newClasst.push(name, (new_fields, new_methods))
