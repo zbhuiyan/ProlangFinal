@@ -354,11 +354,11 @@ class Env[A] (val content: List[(String, A)]) {
 
       override def toString () : String = {
           var result = ""
-	  for (entry <- content) {
-	     result = result + "(" + entry._1 + " <- " + entry._2 + ") "
-	  }
-	  return result
-      }
+  	  for (entry <- content) {
+  	     result = result + "(" + entry._1 + " <- " + entry._2 + ") "
+  	  }
+  	  return result
+        }
 
 
       // push a single binding (id,v) on top of the environment
@@ -877,7 +877,6 @@ class SEdefine (n:String, e:Exp) extends ShellEntry {
 
 class SEClass (name:String, fields:List[(String, Exp)], methods:List[(String, Exp)]) extends ShellEntry {
 
-// // version 1
    def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
       var newClasst = classt
       newClasst = newClasst.push(name, (fields, methods))
@@ -886,6 +885,42 @@ class SEClass (name:String, fields:List[(String, Exp)], methods:List[(String, Ex
 
 }
 
+class SEClassInherit (name:String, name_parent:String, fields:List[(String, Exp)], methods:List[(String, Exp)]) extends ShellEntry {
+
+   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
+      var newClasst = classt
+      val value = classt.lookup(name_parent)
+      val fields_parent = value._1
+      val methods_parent = value._2
+      var new_fields = List[(String, Exp)]()
+      for ((s_child, e_child) <- fields) {
+        for ((s_parent, e_parent) <- fields_parent) {
+          //inherit
+          if (s_child != s_parent) {
+            new_fields :+ (s_parent, e_parent)
+          }
+        }
+        //push in everything that's in the child
+        new_fields :+ (s_child, e_child)
+      }
+
+      var new_methods = List[(String, Exp)]()
+      for ((s_child, e_child) <- methods) {
+        for ((s_parent, e_parent) <- methods_parent) {
+          //inherit
+          if (s_child != s_parent) {
+            new_methods :+ (s_parent, e_parent)
+          }
+        }
+        //push in everything that's in the child
+        new_methods :+ (s_child, e_child)
+      }
+
+      newClasst = newClasst.push(name, (new_fields, new_methods))
+      return (env,symt, newClasst)
+   }
+
+}
 
 class SEquit extends ShellEntry {
 
