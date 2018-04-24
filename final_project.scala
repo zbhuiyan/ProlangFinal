@@ -915,17 +915,22 @@ class SEClassInherit (name:String, name_parent:String, fields:List[(String, Exp)
       val fields_parent = value._1
       val methods_parent = value._2
       var new_fields = List[(String, Exp)]()
-      for ((s_child, e_child) <- fields) {
-        for ((s_parent, e_parent) <- fields_parent) {
-          //inherit
-          if (s_child != s_parent && ! new_fields.contains((s_parent, e_parent))) {
-            println("pushing " + (s_parent, e_parent))
-            new_fields = (s_parent, e_parent) :: new_fields
+
+      for ((s_parent, e_parent) <- fields_parent) {
+        var flag = 0
+        for ((s_child, e_child) <- fields) {
+          if (s_child == s_parent) {
+            flag = 1
           }
         }
-
-        //push in everything that's in the child
-        new_fields = (s_child, e_child) :: new_fields
+        if (flag!=1 && !new_fields.contains((s_parent, e_parent))) {
+            println("pushing " + (s_parent, e_parent))
+            new_fields = (s_parent, e_parent) :: new_fields
+        }   
+      }
+      
+      for ((s_child, e_child) <- fields) {
+          new_fields = (s_child, e_child) :: new_fields
       }
 
       var new_methods = List[(String, Exp)]()
@@ -988,7 +993,7 @@ object Shell {
      ("first",new VPrimOp(Ops.operFirst)),
      ("rest",new VPrimOp(Ops.operRest)),
      ("empty",new VVector(List())),
-     ("cons",new VPrimOp(Ops.operCons)),
+     ("cons",new VPrimOp(Ops.operCons))
    ))
 
 
