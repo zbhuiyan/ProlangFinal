@@ -266,7 +266,6 @@ abstract class Type {
    def isIntVector () : Boolean = return false
    def isFunction () : Boolean = return false
    def isObject () : Boolean = return false
-  //  def getClass (): String = return " "
 
    def funParams () : List[Type] = {
       throw new Exception("Type error: type is not a function\n   "+this)
@@ -746,6 +745,7 @@ class SExpParser extends RegexParsers {
    def METHODS : Parser[Unit] = "methods" ^^ { s => () }
    def FIELD : Parser[Unit] = "field" ^^ { s => () }
    def METHOD : Parser[Unit] = "method" ^^ { s => () }
+   def DOT : Parser[Unit] = "." ^^ { s => () }
 
    // TYPE: new keywords for writing types
 
@@ -837,11 +837,27 @@ class SExpParser extends RegexParsers {
       (LP ~ "define" ~ ID ~ expr ~ RP  ^^ { case _ ~ _ ~ n ~ e ~ _  => new SEdefine(n,e) }) |
       (LP ~ "class" ~ ID ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ fields ~ _ ~ methods ~ _ => new SEClass(id, fields, methods)}) |
       (LP ~ "class" ~ ID ~ "inherits" ~ ID ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ id2 ~ fields ~ _ ~ methods ~ _ => new SEClassInherit(id, id2, fields, methods)}) |
+      (LP ~ ID ~ DOT ~ ID ~ LP ~ RP ~ RP ^^ {case _ ~ className ~ _ ~ method ~ _ ~ _ ~ _ => new SEmethod(className, method)}) | // call method
+      (LP ~ ID ~ DOT ~ ID ~ RP ^^ {case _ ~ className ~ _ ~ field ~ _ => new SEfield(className, field)}) | // return field body
       (expr ^^ { e => new SEexpr(e) }) |
       ("#quit" ^^ { s => new SEquit() })
 
 }
 
+
+// try these two examples
+// (class A (S 1) (K 2), (D 3))
+// (class B inherits A (S hello) (B hi), (L what) (D bye))
+// seems if B inherits from A, the fields and methods have to be the same type. EInteger and EId don't work
+// (class B inherits A (S 10) (B 10), (L 10) (D 10))
+// (class C inherits B (B A), (U U) (L R))
+
+// (class A (String1 2) (String2 3), (Method 4))
+// (class B (String1 a) (String2 b), (Method c))
+// (class C (String1 (+ 10 20)) (String2 (+ 20 20)), (Method (+ 30 20)))
+// (class D inherits A (String1 hello) (String2 (*2 2)), (Method (*4 4)))
+
+//  
 
 //
 //  Shell
@@ -881,7 +897,7 @@ class SEdefine (n:String, e:Exp) extends ShellEntry {
    def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[(String,Exp)], List[(String,Exp)])]) = {
       val t = e.typeOf(symt)
       val v = e.eval(env, classt)
-      println(n + " defined with type " + t)
+      println(n + " definitionned with type " + t)
       return (env.push(n,v),symt.push(n,t),classt)
    }
 
@@ -896,17 +912,51 @@ class SEClass (name:String, fields:List[(String, Exp)], methods:List[(String, Ex
       } else {
         newClasst = newClasst.push(name, (fields, methods))
       }
-      return (env,symt, newClasst)
+      return (env,symt,newClasst)
    }
 
 }
 
-// try these two examples
-// (class A (S 1) (K 2), (D 3))
-// (class B inherits A (S hello) (B hi), (L what) (D bye))
-// seems if B inherits from A, the fields and methods have to be the same type. EInteger and EId don't work
-// (class B inherits A (S 10) (B 10), (L 10) (D 10))
-// (class C inherits B (B A), (U U) (L R))
+
+class SEmethod (name:String, method:String) extends ShellEntry {
+   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
+      println("hi")
+      var value = (List[(String,Exp)](), List[(String,Exp)]())
+      if (classt.contains(name)) {
+        value = classt.lookup(name)
+        val methods = value._2
+        for ((s, e) <- methods) {
+          if (s == method) {
+            println(method + ": " + e)
+          }
+        }
+      } else {
+        throw new Exception("class " + name + " doesn't exist.")
+      }
+      return (env,symt,classt)
+   }
+}
+
+
+class SEfield (name:String, field:String) extends ShellEntry {
+   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
+      
+      println("hi")
+      var value = (List[(String,Exp)](), List[(String,Exp)]())
+      if (classt.contains(name)) {
+        value = classt.lookup(name)
+        val fields = value._1
+        for ((s, e) <- fields) {
+          if (s == field) {
+            println(field + ": " + e)
+          }
+        }
+      } else {
+        throw new Exception("class " + name + " doesn't exist.")
+      }
+      return (env,symt,classt)
+   }
+}
 
 class SEClassInherit (name:String, name_parent:String, fields:List[(String, Exp)], methods:List[(String, Exp)]) extends ShellEntry {
 
@@ -963,6 +1013,7 @@ class SEClassInherit (name:String, name_parent:String, fields:List[(String, Exp)
    }
 
 }
+
 
 class SEquit extends ShellEntry {
 
