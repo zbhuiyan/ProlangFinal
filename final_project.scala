@@ -677,7 +677,7 @@ class VObject (val fields: List[(String,Value)], val methods:List[(String,Value)
      for ((n,v) <- fields) {
        if (n == s) {
        	  return v
-       }  
+       }
      }
      error("No field "+s+" in object")
   }
@@ -706,11 +706,12 @@ class EObject (val class_name: String, val args: List[Exp]) extends Exp {
      for (index <- 1 to args.length) {
        new_env.push(arguments(index), args(index).eval(env, classt))
      }
+     println("new_env" + new_env)
      for (field <- values._2) {
-       val field_val = field._2.eval(env, classt)
+       val field_val = field._2.eval(new_env, classt)
        println(field_val)
        if (arguments.contains(field_val)) {
-         println("hello")
+         println("matched in field")
          var index = arguments.indexOf(field_val)
          fields_val = (field._1, args(index).eval(new_env, classt)) :: fields_val
        } else {
@@ -738,41 +739,6 @@ class EObject (val class_name: String, val args: List[Exp]) extends Exp {
      new TObject(class_name)
 }
 
-
-// def lookup_class(name:String, classt:Env[(List(String, Exp),List(String, Exp))]) :
-
-class EField (val r:Exp, val f:String) extends Exp {
-
-  override def toString () : String =
-     "EField(" + r + "," + f + ")"
-
-  def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
-    val vr = r.eval(env, classt)
-    return vr.lookupField(f)
-  }
-
-  def typeOf (symt:Env[Type]) : Type = {
-    return r.typeOf(symt)
-  }
-
-}
-
-
-class EMethod (val r:Exp, val f:String, val args:List[Exp]) extends Exp {
-
-  override def toString () : String =
-     "EMethod(" + r + "," + f + ")"
-
-  def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
-    val vr = r.eval(env, classt)
-    val m = vr.lookupMethod(f, args)
-    return m.apply(List(vr))
-  }
-
-  def typeOf(symt:Env[Type]) : Type = {
-    return r.typeOf(symt)
-  }
-}
 
 
 
