@@ -62,7 +62,7 @@ abstract class Value {
       error("Value not of type OBJECT")
    }
 
-   def lookupMethod (s:String) : Value = {
+   def lookupMethod (s:String, a:List[Exp]) : Value = {
       error("Value not of type OBJECT")
    }
 
@@ -675,20 +675,20 @@ class VObject (val fields: List[(String,Value)], val methods:List[(String,Value)
 
   override def lookupField (s:String) : Value = {
      for ((n,v) <- fields) {
-       if (n==s) {
+       if (n == s) {
        	  return v
-       }
+       }  
      }
      error("No field "+s+" in object")
   }
 
-  override def lookupMethod (s:String) : Value = {
+  override def lookupMethod (s:String, args:List[Exp]) : Value = {
      for ((n,v) <- methods) {
-       if (n==s) {
-       	  return v
+       if (n == s) {
+       	  return v.apply(args)
        }
      }
-     error("No method "+s+" in object")
+     error("No method "+ s +" in object")
   }
 }
 
@@ -758,14 +758,14 @@ class EField (val r:Exp, val f:String) extends Exp {
 }
 
 
-class EMethod (val r:Exp, val f:String) extends Exp {
+class EMethod (val r:Exp, val f:String, val args:List[Exp]) extends Exp {
 
   override def toString () : String =
      "EMethod(" + r + "," + f + ")"
 
   def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
     val vr = r.eval(env, classt)
-    val m = vr.lookupMethod(f)
+    val m = vr.lookupMethod(f, args)
     return m.apply(List(vr))
   }
 
@@ -882,7 +882,7 @@ class SExpParser extends RegexParsers {
       (LP ~ "define" ~ ID ~ expr ~ RP  ^^ { case _ ~ _ ~ n ~ e ~ _  => new SEdefine(n,e) }) |
       (LP ~ "class" ~ ID ~ LP ~ rep(ID) ~ RP ~ "," ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ args ~ _ ~ _ ~ fields ~ _ ~ methods ~ _ => new SEClass(id, args, fields, methods)}) |
       (LP ~ "class" ~ ID ~ "inherits" ~ ID ~ LP ~ rep(ID) ~ RP ~ "," ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ id2 ~ _ ~ args ~ _ ~ _ ~ fields ~ _ ~ methods ~ _ => new SEClassInherit(id, id2, args, fields, methods)}) |
-      (LP ~ ID ~ DOT ~ ID ~ LP ~ RP ~ RP ^^ {case _ ~ className ~ _ ~ method ~ _ ~ _ ~ _ => new SEmethod(className, method)}) | // call method
+      (LP ~ ID ~ DOT ~ ID ~ LP ~ rep(expr) ~ RP ~ RP ^^ {case _ ~ className ~ _ ~ method ~ _ ~ arguments ~ _ ~ _ => new SEmethod(className, method, arguments)}) | // call method
       (LP ~ ID ~ DOT ~ ID ~ RP ^^ {case _ ~ className ~ _ ~ field ~ _ => new SEfield(className, field)}) | // return field body
       (expr ^^ { e => new SEexpr(e) }) |
       ("#quit" ^^ { s => new SEquit() })
@@ -903,7 +903,9 @@ class SExpParser extends RegexParsers {
 // (class D inherits C (String1 hello) (String2 (* 2 2)), (Method (* 4 4)))
 // (class E inherits A (String1 hello), (Method (* 5 5)))
 
-//
+// (method (y) (+x y))
+// (d.add(10 20))
+
 
 //
 //  Shell
@@ -964,11 +966,11 @@ class SEClass (name:String, args: List[String], fields:List[(String, Exp)], meth
 }
 
 
-class SEmethod (name:String, method:String) extends ShellEntry {
-   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
+class SEmethod (name:String, method:String, arguments:List[(Exp)]) extends ShellEntry {
+  def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
       if (env.contains(name)) {
         val value = env.lookup(name)
-        println(value.lookupMethod(method))
+        println(value.lookupMethod(method, arguments))
       } else {
         throw new Exception("method " + name + " doesn't exist.")
       }
