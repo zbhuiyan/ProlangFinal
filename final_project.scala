@@ -130,7 +130,7 @@ class VBoolean (val b:Boolean) extends Value {
 }
 
 class VString (val s:String) extends Value {
-
+  override def toString () : String = s.toString()
   override def getString () : String = s
 }
 
@@ -152,7 +152,7 @@ class VPrimOp (val oper : (List[Value]) => Value) extends Value {
 }
 
 
-class VRecClosure (val self: String, val params: List[String], val body:Exp, val env:Env[Value], val classt : Env[(List[(String, Exp)], List[(String, Exp)])]) extends Value {
+class VRecClosure (val self: String, val params: List[String], val body:Exp, val env:Env[Value], val classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) extends Value {
 
   override def toString () : String = params + " | " + self + " => " + body
 
@@ -412,7 +412,7 @@ class Env[A] (val content: List[(String, A)]) {
 
 abstract class Exp {
 
-    def eval (env : Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value
+    def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value
 
     def error (msg : String) : Nothing = {
        throw new Exception("Eval error: "+ msg + "\n   in expression " + this)
@@ -443,7 +443,7 @@ class EInteger (val i:Integer) extends Exp {
     override def toString () : String =
         "EInteger(" + i + ")"
 
-    def eval (env:Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value =
+    def eval (env:Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value =
         new VInteger(i)
 
     def typeOf (symt:Env[Type]) : Type =
@@ -457,7 +457,7 @@ class EBoolean (val b:Boolean) extends Exp {
     override def toString () : String =
         "EBoolean(" + b + ")"
 
-    def eval (env:Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value =
+    def eval (env:Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value =
         new VBoolean(b)
 
     def typeOf (symt:Env[Type]) : Type =
@@ -470,7 +470,7 @@ class EString (val s:String) extends Exp {
     override def toString () : String =
         "EString(" + s + ")"
 
-    def eval (env:Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value =
+    def eval (env:Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value =
         new VString(s)
 
     def typeOf (symt:Env[Type]) : Type =
@@ -484,7 +484,7 @@ class EVector (val es: List[Exp]) extends Exp {
    override def toString () : String =
       "EVector" + es.addString(new StringBuilder(),"(", " ", ")").toString()
 
-   def eval (env : Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value = {
+   def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
       val vs = es.map((e:Exp) => e.eval(env, classt))
       return new VVector(vs)
    }
@@ -506,7 +506,7 @@ class EIf (val ec : Exp, val et : Exp, val ee : Exp) extends Exp {
     override def toString () : String =
         "EIf(" + ec + "," + et + "," + ee +")"
 
-    def eval (env:Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value = {
+    def eval (env:Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
         val ev = ec.eval(env, classt)
       	if (!ev.getBool()) {
         	  return ee.eval(env, classt)
@@ -536,7 +536,7 @@ class EId (val id : String) extends Exp {
     override def toString () : String =
         "EId(" + id + ")"
 
-    def eval (env : Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value = env.lookup(id)
+    def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = env.lookup(id)
 
     def typeOf (symt:Env[Type]) : Type =  symt.lookup(id)
 }
@@ -546,7 +546,7 @@ class EApply (val f: Exp, val args: List[Exp]) extends Exp {
    override def toString () : String =
       "EApply(" + f + "," + args + ")"
 
-   def eval (env : Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value = {
+   def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
       val vf = f.eval(env,classt)
       val vargs = args.map((e:Exp) => e.eval(env,classt))
       return vf.apply(vargs)
@@ -579,7 +579,7 @@ class EFunction (val params : List[String], val typ : Type, val body : Exp) exte
    override def toString () : String =
      "EFunction(" + params + "," + body + ")"
 
-   def eval (env : Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value =
+   def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value =
       new VRecClosure("",params,body,env,classt)
 
     def typeOf (symt:Env[Type]) : Type = {
@@ -608,7 +608,7 @@ class ERecFunction (val self: String, val params: List[String], val typ: Type, v
    override def toString () : String =
      "ERecFunction(" + self + "," + params + "," + body + ")"
 
-   def eval (env : Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value =
+   def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value =
       new VRecClosure(self,params,body,env,classt)
 
    def typeOf (symt:Env[Type]) : Type = {
@@ -641,7 +641,7 @@ class ELet (val bindings : List[(String,Exp)], val ebody : Exp) extends Exp {
     override def toString () : String =
         "ELet(" + bindings + "," + ebody + ")"
 
-    def eval (env : Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value = {
+    def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
         var new_env = env
         for ((n,e) <- bindings) {
           val v = e.eval(env,classt)
@@ -697,17 +697,16 @@ class EObject (val class_name: String) extends Exp {
    override def toString () : String =
      "EObject(" + class_name + ")"
 
-   def eval (env : Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value = {
+   def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
      val values = classt.lookup(class_name)
-     val fields_val = values._1.map((p) => (p._1,p._2.eval(env, classt)))
+     val fields_val = values._2.map((p) => (p._1,p._2.eval(env, classt)))
      // wrap every method with as function expecting "this" as an argument
-     val meths_val = values._2.map((p) => (p._1,new VRecClosure("",List("this"),p._2,env,classt)))
+     val meths_val = values._3.map((p) => (p._1,new VRecClosure("",List("this"),p._2,env,classt)))
      return new VObject(fields_val, meths_val)
    }
 
    def typeOf (symt:Env[Type]) : Type =
      new TObject(class_name)
-
 }
 
 
@@ -718,7 +717,7 @@ class EField (val r:Exp, val f:String) extends Exp {
   override def toString () : String =
      "EField(" + r + "," + f + ")"
 
-  def eval (env : Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value = {
+  def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
     val vr = r.eval(env, classt)
     return vr.lookupField(f)
   }
@@ -735,7 +734,7 @@ class EMethod (val r:Exp, val f:String) extends Exp {
   override def toString () : String =
      "EMethod(" + r + "," + f + ")"
 
-  def eval (env : Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value = {
+  def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
     val vr = r.eval(env, classt)
     val m = vr.lookupMethod(f)
     return m.apply(List(vr))
@@ -796,8 +795,11 @@ class SExpParser extends RegexParsers {
    def atomic_id : Parser[Exp] =
       ID ^^ { s => new EId(s) }
 
+   def atomic_string : Parser[Exp] =
+      ID ^^ { s => new EString(s) }
+
    def atomic : Parser[Exp] =
-      ( atomic_int | atomic_id ) ^^ { e => e}
+      ( atomic_int | atomic_string | atomic_id ) ^^ { e => e}
 
    def expr_if : Parser[Exp] =
       LP ~ IF ~ expr ~ expr ~ expr ~ RP ^^
@@ -812,27 +814,6 @@ class SExpParser extends RegexParsers {
 
    def expr_vec : Parser[Exp] =
       LB ~ rep(expr) ~ RB ^^ { case _ ~ es ~ _ => new EVector(es) }
-
-  //  def mkClass (name:String, params:List[String], ty: Type) : Exp = {
-  //       return new ERecFunction(name,params, ty, new EObject(name))
-  //     }
-
-  //  def meth_binding : Parser[(String,Exp)] =
-  //        LP ~ ID ~ LP ~ rep(ID) ~ RP ~ typ ~ expr ~ RP ^^ { case _ ~ name ~ _ ~ params ~ _ ~ typ  ~ body ~ _ => (name, new EFunction(params, typ, body)) }
-   //
-  //     def expr_class : Parser[Exp] =
-  //       LP ~ CLASS ~ ID ~ LP ~ rep(ID) ~ RP ~ LP ~ FIELDS ~ rep(binding) ~ RP ~ typ ~ LP ~ METHODS ~ rep(meth_binding) ~ RP ~ RP ^^
-  //          { case _ ~ _ ~ rec ~ _ ~ params ~ _ ~ _ ~ _ ~ fields ~ _ ~ typ ~ _ ~ _ ~ meths ~ _ ~ _ => mkClass(rec,params,typ,fields,meths) }
-   //
-  //     def expr_field : Parser[Exp] =
-  //       LP ~ FIELD ~ expr ~ ID ~ RP ^^ { case _ ~ _ ~ e ~ id ~ _ => new EField(e,id) }
-   //
-  //     def expr_meth : Parser[Exp] =
-  //       LP ~ METHOD ~ expr ~ ID ~ RP ^^ { case _ ~ _ ~ e ~ id ~ _ => new EMethod(e,id) }
-
-   // TYPE: changed surface syntax of functions (and recursive functions)
-   //       to add a type annotation for functions
-   //  e.g. (fun (a b c) (tfun (int int int) bool) (if (= a b) (= a c) false))
 
    def expr_fun : Parser[Exp] =
       LP ~ FUN ~ LP ~ rep(ID) ~ RP ~ typ ~ expr ~ RP ^^
@@ -891,7 +872,7 @@ class SExpParser extends RegexParsers {
 // (class B (String1 a) (String2 b), (Method c))
 // (class C (String1 (+ 10 20)) (String2 (+ 20 20)), (Method (+ 30 20)))
 // (class D inherits C (String1 hello) (String2 (* 2 2)), (Method (* 4 4)))
-// (class E inherits C (String1 hello), (Method (* 5 5)))
+// (class E inherits A (String1 hello), (Method (* 5 5)))
 
 // (method (y) (+x y))
 // ((d.add()) 10)
@@ -908,7 +889,7 @@ abstract class ShellEntry {
    // (representing the various entries you
    //  can type at the shell)
 
-   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[(String,Exp)], List[(String,Exp)])])
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[String], List[(String,Exp)], List[(String,Exp)])])
 }
 
 
@@ -918,7 +899,7 @@ abstract class ShellEntry {
 
 class SEexpr (e:Exp) extends ShellEntry {
 
-   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[(String,Exp)], List[(String,Exp)])]) = {
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
       val t = e.typeOf(symt)
       val v = e.eval(env, classt)
       println(v+" : "+t)
@@ -933,7 +914,7 @@ class SEexpr (e:Exp) extends ShellEntry {
 
 class SEdefine (n:String, e:Exp) extends ShellEntry {
 
-   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[(String,Exp)], List[(String,Exp)])]) = {
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
       val t = e.typeOf(symt)
       val v = e.eval(env, classt)
       println(n + " defined with type " + t)
@@ -942,14 +923,14 @@ class SEdefine (n:String, e:Exp) extends ShellEntry {
 
 }
 
-class SEClass (name:String, fields:List[(String, Exp)], methods:List[(String, Exp)]) extends ShellEntry {
+class SEClass (name:String, args: List[String], fields:List[(String, Exp)], methods:List[(String, Exp)]) extends ShellEntry {
 
-   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
+   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
       var newClasst = classt
       if (classt.contains(name)) {
         throw new Exception("class " + name + " already exists.")
       } else {
-        newClasst = newClasst.push(name, (fields, methods))
+        newClasst = newClasst.push(name, (args, fields, methods))
       }
       return (env,symt,newClasst)
    }
@@ -971,7 +952,7 @@ class SEmethod (name:String, method:String, arguments:List[(Exp)]) extends Shell
 
 
 class SEfield (name:String, field:String) extends ShellEntry {
-   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
+   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
        if (env.contains(name)) {
          val value = env.lookup(name)
          println(value.lookupField(field))
@@ -982,19 +963,19 @@ class SEfield (name:String, field:String) extends ShellEntry {
    }
 }
 
-class SEClassInherit (name:String, name_parent:String, fields:List[(String, Exp)], methods:List[(String, Exp)]) extends ShellEntry {
+class SEClassInherit (name:String, name_parent:String, args: List[String], fields:List[(String, Exp)], methods:List[(String, Exp)]) extends ShellEntry {
 
-   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
+   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
       var newClasst = classt
-      var value = (List[(String,Exp)](), List[(String,Exp)]())
+      var value = (List[String](), List[(String,Exp)](), List[(String,Exp)]())
       try {
         value = classt.lookup(name_parent)
       } catch {
         case e: Exception => throw new Exception("Parent class doesn't exist.")
       }
 
-      val fields_parent = value._1
-      val methods_parent = value._2
+      val fields_parent = value._2
+      val methods_parent = value._3
       var new_fields = List[(String, Exp)]()
       var new_methods = List[(String, Exp)]()
 
@@ -1032,7 +1013,7 @@ class SEClassInherit (name:String, name_parent:String, fields:List[(String, Exp)
           new_methods = (s_child, e_child) :: new_methods
       }
 
-      newClasst = newClasst.push(name, (new_fields, new_methods))
+      newClasst = newClasst.push(name, (args, new_fields, new_methods))
       return (env,symt, newClasst)
    }
 
@@ -1041,7 +1022,7 @@ class SEClassInherit (name:String, name_parent:String, fields:List[(String, Exp)
 
 class SEquit extends ShellEntry {
 
-   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[(String,Exp)], List[(String,Exp)])]) = {
+   def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
 
       System.exit(0)
       return (env,symt,classt)
@@ -1063,7 +1044,7 @@ object Shell {
 
 
    val nullEnv = new Env[Value](List())
-   val nullClasst = new Env[(List[(String,Exp)], List[(String,Exp)])](List())
+   val nullClasst = new Env[(List[String], List[(String,Exp)], List[(String,Exp)])](List())
 
    //
    // Standard environment
@@ -1107,7 +1088,7 @@ object Shell {
      ("cons",new TFunction(List(TInteger,TIntVector),TIntVector))
    ))
 
-  val stdClasst = new Env[(List[(String,Exp)], List[(String,Exp)])](List())
+  val stdClasst = new Env[(List[String], List[(String,Exp)], List[(String,Exp)])](List())
 
    def shell () : Unit = {
 
