@@ -872,7 +872,7 @@ class SExpParser extends RegexParsers {
       (LP ~ "define" ~ ID ~ expr ~ RP  ^^ { case _ ~ _ ~ n ~ e ~ _  => new SEdefine(n,e) }) |
       (LP ~ "class" ~ ID ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ fields ~ _ ~ methods ~ _ => new SEClass(id, fields, methods)}) |
       (LP ~ "class" ~ ID ~ "inherits" ~ ID ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ id2 ~ fields ~ _ ~ methods ~ _ => new SEClassInherit(id, id2, fields, methods)}) |
-      (LP ~ ID ~ DOT ~ ID ~ LP ~ RP ~ RP ^^ {case _ ~ className ~ _ ~ method ~ _ ~ _ ~ _ => new SEmethod(className, method)}) | // call method
+      (LP ~ ID ~ DOT ~ ID ~ LP ~ rep(INT) ~ RP ~ RP ^^ {case _ ~ className ~ _ ~ method ~ _ ~ arguments ~ _ ~ _ => new SEmethod(className, method, arguments)}) | // call method
       (LP ~ ID ~ DOT ~ ID ~ RP ^^ {case _ ~ className ~ _ ~ field ~ _ => new SEfield(className, field)}) | // return field body
       (expr ^^ { e => new SEexpr(e) }) |
       ("#quit" ^^ { s => new SEquit() })
@@ -892,6 +892,9 @@ class SExpParser extends RegexParsers {
 // (class C (String1 (+ 10 20)) (String2 (+ 20 20)), (Method (+ 30 20)))
 // (class D inherits C (String1 hello) (String2 (* 2 2)), (Method (* 4 4)))
 // (class E inherits C (String1 hello), (Method (* 5 5)))
+
+// (method (y) (+x y))
+// ((d.add()) 10)
 
 //
 
@@ -954,7 +957,7 @@ class SEClass (name:String, fields:List[(String, Exp)], methods:List[(String, Ex
 }
 
 
-class SEmethod (name:String, method:String) extends ShellEntry {
+class SEmethod (name:String, method:String, arguments:List[(Exp)]) extends ShellEntry {
    def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
       if (env.contains(name)) {
         val value = env.lookup(name)
