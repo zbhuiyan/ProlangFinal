@@ -78,6 +78,12 @@ abstract class Value {
      }
    }
 
+   def checkString () : Unit = {
+     if (!isString()) {
+        error("Value not of type STRING")
+     }
+   }
+
    def checkVector () : Unit = {
      if (!isVector()) {
         error("Value not of type VECTOR")
