@@ -62,7 +62,7 @@ abstract class Value {
       error("Value not of type OBJECT")
    }
 
-   def lookupMethod (s:String, a:List[Exp]) : Value = {
+   def lookupMethod (s:String, a:List[Value]) : Value = {
       error("Value not of type OBJECT")
    }
 
@@ -682,7 +682,7 @@ class VObject (val fields: List[(String,Value)], val methods:List[(String,Value)
      error("No field "+s+" in object")
   }
 
-  override def lookupMethod (s:String, args:List[Exp]) : Value = {
+  override def lookupMethod (s:String, args:List[Value]) : Value = {
      for ((n,v) <- methods) {
        if (n == s) {
        	  return v.apply(args)
@@ -738,7 +738,6 @@ class EObject (val class_name: String, val args: List[Exp]) extends Exp {
    def typeOf (symt:Env[Type]) : Type =
      new TObject(class_name)
 }
-
 
 
 
@@ -932,11 +931,16 @@ class SEClass (name:String, args: List[String], fields:List[(String, Exp)], meth
 }
 
 
-class SEmethod (name:String, method:String, arguments:List[(Exp)]) extends ShellEntry {
+class SEmethod (name:String, method:String, args:List[(Exp)]) extends ShellEntry {
   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
       if (env.contains(name)) {
         val value = env.lookup(name)
-        println(value.lookupMethod(method, arguments))
+        var newArgs = List[Value]()
+        for (a <- args) {
+          val v = a.eval(env, classt)
+          newArgs = v :: newArgs
+        }
+        println(value.lookupMethod(method, newArgs))
       } else {
         throw new Exception("method " + name + " doesn't exist.")
       }
