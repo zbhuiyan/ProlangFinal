@@ -304,7 +304,7 @@ object TIntVector extends Type {
 
 class TObject (val class_name:String) extends Type {
 
-   override def toString () : String = "(object " + class_name + ")"
+   override def toString () : String = "(class " + class_name + ")"
    def isSame (t:Type):Boolean = return t.isObject()
    override def isObject () : Boolean = true
   //  override def getClass () : String = return class_name
@@ -855,9 +855,10 @@ class SExpParser extends RegexParsers {
 // (class A (String1 2) (String2 3), (Method 4))
 // (class B (String1 a) (String2 b), (Method c))
 // (class C (String1 (+ 10 20)) (String2 (+ 20 20)), (Method (+ 30 20)))
-// (class D inherits A (String1 hello) (String2 (*2 2)), (Method (*4 4)))
+// (class D inherits C (String1 hello) (String2 (* 2 2)), (Method (* 4 4)))
+// (class E inherits C (String1 hello), (Method (* 5 5)))
 
-//  
+//
 
 //
 //  Shell
@@ -897,7 +898,7 @@ class SEdefine (n:String, e:Exp) extends ShellEntry {
    def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value],Env[Type],Env[(List[(String,Exp)], List[(String,Exp)])]) = {
       val t = e.typeOf(symt)
       val v = e.eval(env, classt)
-      println(n + " definitionned with type " + t)
+      println(n + " defined with type " + t)
       return (env.push(n,v),symt.push(n,t),classt)
    }
 
@@ -920,18 +921,11 @@ class SEClass (name:String, fields:List[(String, Exp)], methods:List[(String, Ex
 
 class SEmethod (name:String, method:String) extends ShellEntry {
    def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
-      println("hi")
-      var value = (List[(String,Exp)](), List[(String,Exp)]())
-      if (classt.contains(name)) {
-        value = classt.lookup(name)
-        val methods = value._2
-        for ((s, e) <- methods) {
-          if (s == method) {
-            println(method + ": " + e)
-          }
-        }
+      if (env.contains(name)) {
+        val value = env.lookup(name)
+        println(value.lookupMethod(method))
       } else {
-        throw new Exception("class " + name + " doesn't exist.")
+        throw new Exception("method " + name + " doesn't exist.")
       }
       return (env,symt,classt)
    }
@@ -940,19 +934,11 @@ class SEmethod (name:String, method:String) extends ShellEntry {
 
 class SEfield (name:String, field:String) extends ShellEntry {
    def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[(String,Exp)], List[(String,Exp)])]) = {
-      
-      println("hi")
-      var value = (List[(String,Exp)](), List[(String,Exp)]())
-      if (classt.contains(name)) {
-        value = classt.lookup(name)
-        val fields = value._1
-        for ((s, e) <- fields) {
-          if (s == field) {
-            println(field + ": " + e)
-          }
-        }
-      } else {
-        throw new Exception("class " + name + " doesn't exist.")
+       if (env.contains(name)) {
+         val value = env.lookup(name)
+         println(value.lookupField(field))
+       } else {
+        throw new Exception("field " + name + " doesn't exist.")
       }
       return (env,symt,classt)
    }
