@@ -17,7 +17,7 @@ abstract class Value {
    // TYPE: doesn't matter -- type system will ensure these never happens...
    def getInt () : Int = 0
    def getBool () : Boolean = false
-   def getString () : String = true
+   def getString () : String = ""
    def getList () : List[Value] = List()
    def apply (args: List[Value]) : Value = new VInteger(0)
 
