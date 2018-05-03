@@ -17,11 +17,13 @@ abstract class Value {
    // TYPE: doesn't matter -- type system will ensure these never happens...
    def getInt () : Int = 0
    def getBool () : Boolean = false
+   def getString () : String = ""
    def getList () : List[Value] = List()
    def apply (args: List[Value]) : Value = new VInteger(0)
 
    def isInteger () : Boolean = false
    def isBoolean () : Boolean = false
+   def isString () : Boolean = false
    def isVector () : Boolean = false
    def isFunction () : Boolean = false
    def isRefCell () : Boolean = false
@@ -76,6 +78,12 @@ abstract class Value {
      }
    }
 
+   def checkString () : Unit = {
+     if (!isString()) {
+        error("Value not of type STRING")
+     }
+   }
+
    def checkVector () : Unit = {
      if (!isVector()) {
         error("Value not of type VECTOR")
@@ -121,6 +129,10 @@ class VBoolean (val b:Boolean) extends Value {
   override def getBool () : Boolean = b
 }
 
+class VString (val s:String) extends Value {
+
+  override def getString () : String = s
+}
 
 class VVector (val l:List[Value]) extends Value {
 
@@ -263,6 +275,7 @@ abstract class Type {
 
    def isInteger () : Boolean = return false
    def isBoolean () : Boolean = return false
+   def isString () : Boolean = return false
    def isIntVector () : Boolean = return false
    def isFunction () : Boolean = return false
    def isObject () : Boolean = return false
@@ -292,6 +305,14 @@ object TBoolean extends Type {
 
    def isSame (t:Type):Boolean = return t.isBoolean()
    override def isBoolean () : Boolean = true
+}
+
+object TString extends Type {
+
+   override def toString () : String = "string"
+
+   def isSame (t:Type):Boolean = return t.isString()
+   override def isString () : Boolean = true
 }
 
 object TIntVector extends Type {
@@ -441,6 +462,19 @@ class EBoolean (val b:Boolean) extends Exp {
 
     def typeOf (symt:Env[Type]) : Type =
         TBoolean
+}
+
+class EString (val s:String) extends Exp {
+    // string literal
+
+    override def toString () : String =
+        "EString(" + s + ")"
+
+    def eval (env:Env[Value], classt : Env[(List[(String, Exp)], List[(String, Exp)])]) : Value =
+        new VString(s)
+
+    def typeOf (symt:Env[Type]) : Type =
+        TString
 }
 
 
@@ -751,6 +785,7 @@ class SExpParser extends RegexParsers {
 
    def TINT : Parser[Unit] = "int" ^^ { s => () }
    def TBOOL : Parser[Unit] = "bool" ^^ { s => () }
+   def TSTRING : Parser[Unit] = "string" ^^ { s => () }
    def TINTV : Parser[Unit] = "ivector" ^^ { s => () }
    def TFUN : Parser[Unit] = "tfun" ^^ { s => () }
 
