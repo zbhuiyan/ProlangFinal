@@ -692,16 +692,45 @@ class VObject (val fields: List[(String,Value)], val methods:List[(String,Value)
   }
 }
 
-class EObject (val class_name: String) extends Exp {
+class EObject (val class_name: String, val args: List[Exp]) extends Exp {
 
    override def toString () : String =
-     "EObject(" + class_name + ")"
+     "EObject(" + class_name + ", " + args + ")"
 
    def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
      val values = classt.lookup(class_name)
-     val fields_val = values._2.map((p) => (p._1,p._2.eval(env, classt)))
+     val arguments = values._1
+     var fields_val = List[(String, Value)]()
+     var meths_val = List[(String, Value)]()
+     var new_env = env
+     for (index <- 1 to args.length) {
+       new_env.push(arguments(index), args(index).eval(env, classt))
+     }
+     for (field <- values._2) {
+       val field_val = field._2.eval(env, classt)
+       println(field_val)
+       if (arguments.contains(field_val)) {
+         println("hello")
+         var index = arguments.indexOf(field_val)
+         fields_val = (field._1, args(index).eval(new_env, classt)) :: fields_val
+       } else {
+         fields_val = (field._1, field._2.eval(new_env, classt)) :: fields_val
+       }
+     }
+    //  for (method <- values._3) {
+    //    val field_val = method._2.eval(env, classt)
+    //    println(field_val)
+    //    if (arguments.contains(field_val)) {
+    //      var index = arguments.indexOf(field_val)
+    //      fields_val = (field._1, args(index).eval(env, classt)) :: fields_val
+    //    } else {
+    //      fields_val = (field._1, field._2.eval(env, classt)) :: fields_val
+    //    }
+    //  }
+
+
      // wrap every method with as function expecting "this" as an argument
-     val meths_val = values._3.map((p) => (p._1,new VRecClosure("",List("this"),p._2,env,classt)))
+    //  val meths_val = values._3.map((p) => (p._1,new VRecClosure("",List("this"),p._2,env,classt)))
      return new VObject(fields_val, meths_val)
    }
 
@@ -768,7 +797,7 @@ class SExpParser extends RegexParsers {
    def INT : Parser[Int] = """[0-9]+""".r ^^ { s => s.toInt }
    def IF : Parser[Unit] = "if" ^^ { s => () }
    def ID : Parser[String] = """[a-zA-Z_+*\-:.?=<>!|][a-zA-Z0-9_+\-*:.?=<>!|]*""".r ^^ { s => s }
-
+   def STRING : Parser[String] = """\".*\"""".r ^^ { s => s }
    def FUN : Parser[Unit] = "fun" ^^ { s => () }
    def LET : Parser[Unit] = "let" ^^ { s => () }
    def NEW : Parser[Unit] = "new" ^^ { s => () }
@@ -796,7 +825,7 @@ class SExpParser extends RegexParsers {
       ID ^^ { s => new EId(s) }
 
    def atomic_string : Parser[Exp] =
-      ID ^^ { s => new EString(s) }
+      STRING ^^ { s => new EString(s) }
 
    def atomic : Parser[Exp] =
       ( atomic_int | atomic_string | atomic_id ) ^^ { e => e}
@@ -827,7 +856,7 @@ class SExpParser extends RegexParsers {
       LP ~ expr ~ rep(expr) ~ RP ^^ { case _ ~ ef ~ eargs ~ _ => new EApply(ef,eargs) }
 
    def expr_class: Parser[Exp] =
-      LP ~ NEW ~ ID ~ RP ^^ {case _ ~ _ ~ id ~ _  => new EObject(id)}
+      LP ~ NEW ~ ID ~ LP ~ rep(expr) ~ RP ~ RP ^^ {case _ ~ _ ~ id ~ _ ~ args ~ _ ~ _  => new EObject(id, args)}
 
    def expr : Parser[Exp] =
       ( atomic | expr_if | expr_class | expr_vec | expr_fun | expr_funr | expr_let | expr_app ) ^^
