@@ -62,7 +62,7 @@ abstract class Value {
       error("Value not of type OBJECT")
    }
 
-   def lookupMethod (s:String, a:List[Value]) : Value = {
+   def lookupMethod (s:String) : Value = {
       error("Value not of type OBJECT")
    }
 
@@ -682,10 +682,10 @@ class VObject (val fields: List[(String,Value)], val methods:List[(String,Value)
      error("No field "+s+" in object")
   }
 
-  override def lookupMethod (s:String, args:List[Value]) : Value = {
+  override def lookupMethod (s:String) : Value = {
      for ((n,v) <- methods) {
        if (n == s) {
-       	  return v.apply(args)
+       	  return v
        }
      }
      error("No method "+ s +" in object")
@@ -739,6 +739,59 @@ class EObject (val class_name: String, val args: List[Exp]) extends Exp {
      new TObject(class_name)
 }
 
+class EField (val name:String, val field:String) extends Exp {
+
+   override def toString () : String =
+      "EField(" + name + "," + field + ")"
+
+   def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
+     if (env.contains(name)) {
+       val value = env.lookup(name)
+       val result = value.lookupField(field)
+       println(result)
+       return result
+     } else {
+       error("No " + field + " found")
+     }
+   }
+
+   def typeOf (symt:Env[Type]) : Type = {
+     return TString
+    //  return name.typeOf(symt)
+   }
+
+ }
+
+// (class Adder (x y) , (field x) , (method y))
+// (define a (new Adder (1 2))
+
+ class EMethod (val name:String, val method:String, val args:List[Exp]) extends Exp {
+
+   override def toString () : String =
+      "EMethod(" + name + "," + method + ")"
+
+   def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
+     if (env.contains(name)) {
+        val value = env.lookup(name)
+        var newArgs = List[Value]()
+        for (a <- args) {
+          val v = a.eval(env, classt)
+          newArgs = v :: newArgs
+        }
+        val result = value.lookupMethod(method)
+        println(result)
+        return result.apply(newArgs)
+      } else {
+        error("No method" + method + " found")
+      }
+
+   }
+
+   def typeOf(symt:Env[Type]) : Type = {
+     return TString
+    //  return name.typeOf(symt)
+   }
+ }
 
 
 //
@@ -820,11 +873,17 @@ class SExpParser extends RegexParsers {
    def expr_app : Parser[Exp] =
       LP ~ expr ~ rep(expr) ~ RP ^^ { case _ ~ ef ~ eargs ~ _ => new EApply(ef,eargs) }
 
-   def expr_class: Parser[Exp] =
+   def expr_object: Parser[Exp] =
       LP ~ NEW ~ ID ~ LP ~ rep(expr) ~ RP ~ RP ^^ {case _ ~ _ ~ id ~ _ ~ args ~ _ ~ _  => new EObject(id, args)}
 
+   def expr_method: Parser[Exp] =
+      LP ~ ID ~ DOT ~ ID ~ LP ~ rep(expr) ~ RP ~ RP ^^ {case _ ~ class_name ~ _ ~ method ~ _ ~ arguments ~ _ ~ _ => new EMethod(class_name, method, arguments)}
+
+   def expr_field: Parser[Exp] =
+      LP ~ ID ~ DOT ~ ID ~ RP ^^ {case _ ~ class_name ~ _ ~ field ~ _ => new EField(class_name, field)}
+
    def expr : Parser[Exp] =
-      ( atomic | expr_if | expr_class | expr_vec | expr_fun | expr_funr | expr_let | expr_app ) ^^
+      ( atomic | expr_if | expr_object | expr_field | expr_method | expr_vec | expr_fun | expr_funr | expr_let | expr_app ) ^^
            { e => e }
 
    def typ_int : Parser[Type] =
@@ -847,8 +906,6 @@ class SExpParser extends RegexParsers {
       (LP ~ "define" ~ ID ~ expr ~ RP  ^^ { case _ ~ _ ~ n ~ e ~ _  => new SEdefine(n,e) }) |
       (LP ~ "class" ~ ID ~ LP ~ rep(ID) ~ RP ~ "," ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ args ~ _ ~ _ ~ fields ~ _ ~ methods ~ _ => new SEClass(id, args, fields, methods)}) |
       (LP ~ "class" ~ ID ~ "inherits" ~ ID ~ LP ~ rep(ID) ~ RP ~ "," ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ id2 ~ _ ~ args ~ _ ~ _ ~ fields ~ _ ~ methods ~ _ => new SEClassInherit(id, id2, args, fields, methods)}) |
-      (LP ~ ID ~ DOT ~ ID ~ LP ~ rep(expr) ~ RP ~ RP ^^ {case _ ~ className ~ _ ~ method ~ _ ~ arguments ~ _ ~ _ => new SEmethod(className, method, arguments)}) | // call method
-      (LP ~ ID ~ DOT ~ ID ~ RP ^^ {case _ ~ className ~ _ ~ field ~ _ => new SEfield(className, field)}) | // return field body
       (expr ^^ { e => new SEexpr(e) }) |
       ("#quit" ^^ { s => new SEquit() })
 
@@ -931,35 +988,35 @@ class SEClass (name:String, args: List[String], fields:List[(String, Exp)], meth
 }
 
 
-class SEmethod (name:String, method:String, args:List[(Exp)]) extends ShellEntry {
-  def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
-      if (env.contains(name)) {
-        val value = env.lookup(name)
-        var newArgs = List[Value]()
-        for (a <- args) {
-          val v = a.eval(env, classt)
-          newArgs = v :: newArgs
-        }
-        println(value.lookupMethod(method, newArgs))
-      } else {
-        throw new Exception("method " + name + " doesn't exist.")
-      }
-      return (env,symt,classt)
-   }
-}
-
-
-class SEfield (name:String, field:String) extends ShellEntry {
-   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
-       if (env.contains(name)) {
-         val value = env.lookup(name)
-         println(value.lookupField(field))
-       } else {
-        throw new Exception("field " + name + " doesn't exist.")
-      }
-      return (env,symt,classt)
-   }
-}
+// class SEmethod (name:String, method:String, args:List[(Exp)]) extends ShellEntry {
+//   def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
+//       if (env.contains(name)) {
+//         val value = env.lookup(name)
+//         var newArgs = List[Value]()
+//         for (a <- args) {
+//           val v = a.eval(env, classt)
+//           newArgs = v :: newArgs
+//         }
+//         println(value.lookupMethod(method, newArgs))
+//       } else {
+//         throw new Exception("method " + name + " doesn't exist.")
+//       }
+//       return (env,symt,classt)
+//    }
+// }
+//
+//
+// class SEfield (name:String, field:String) extends ShellEntry {
+//    def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
+//        if (env.contains(name)) {
+//          val value = env.lookup(name)
+//          println(value.lookupField(field))
+//        } else {
+//         throw new Exception("field " + name + " doesn't exist.")
+//       }
+//       return (env,symt,classt)
+//    }
+// }
 
 class SEClassInherit (name:String, name_parent:String, args: List[String], fields:List[(String, Exp)], methods:List[(String, Exp)]) extends ShellEntry {
 
