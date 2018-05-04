@@ -762,8 +762,10 @@ class EField (val name:String, val field:String) extends Exp {
 
  }
 
-// (class Adder (x y) , (field x) , (method y))
+// (class Adder (x y) , (field x) , (method (z) (+ y z))
 // (define a (new Adder (1 2))
+// (a . field)
+// (a . method (1))
 
  class EMethod (val name:String, val method:String, val args:List[Exp]) extends Exp {
 
