@@ -796,6 +796,35 @@ class EField (val name:String, val field:String) extends Exp {
  }
 
 
+  class EMethodHelper (val methodName:String, val input:List[Exp], val method:List[(String, Exp)]) extends Exp {
+
+   override def toString () : String =
+      "EMethodHelper(" + methodName + "," + input + "," + method + ")"
+
+   def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, Exp)])]) : Value = {
+     if (env.contains(methodName)) {
+        val value = env.lookup(methodName)
+        var newArgs = List[Value]()
+        for (a <- input) {
+          val v = a.eval(env, classt)
+          newArgs = v :: newArgs
+        }
+        val result = value.lookupMethod(methodName)
+        println(result)
+        return result.apply(newArgs)
+      } else {
+        error("No method" + method + " found")
+      }
+
+   }
+
+   def typeOf(symt:Env[Type]) : Type = {
+     return TString
+    //  return name.typeOf(symt)
+   }
+ }
+
+
 //
 // SURFACE SYNTAX (S-expressions)
 //
@@ -884,8 +913,13 @@ class SExpParser extends RegexParsers {
    def expr_field: Parser[Exp] =
       LP ~ ID ~ DOT ~ ID ~ RP ^^ {case _ ~ class_name ~ _ ~ field ~ _ => new EField(class_name, field)}
 
+   def method_helper: Parser[Exp] =
+      LP ~ ID ~ LP ~ rep(ID) ~ RP ~ rep(binding) ~ RP ^^ {case _ ~ methodName ~ _ ~ input ~ _ ~ method ~ _ => new EMethodHelper(methodName, input, method)}
+
+   // (method (x) (+y z))
+
    def expr : Parser[Exp] =
-      ( atomic | expr_if | expr_object | expr_field | expr_method | expr_vec | expr_fun | expr_funr | expr_let | expr_app ) ^^
+      ( atomic | expr_if | expr_object | expr_field | expr_method | expr_vec | expr_fun | expr_funr | expr_let | expr_app | method_helper) ^^
            { e => e }
 
    def typ_int : Parser[Type] =
@@ -905,8 +939,8 @@ class SExpParser extends RegexParsers {
       ( typ_int | typ_bool | typ_intvec | typ_fun ) ^^ { e => e }
 
    def shell_entry : Parser[ShellEntry] =
-      (LP ~ "define" ~ ID ~ expr ~ RP  ^^ { case _ ~ _ ~ n ~ e ~ _  => new SEdefine(n,e) }) |
-      (LP ~ "class" ~ ID ~ LP ~ rep(ID) ~ RP ~ "," ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ args ~ _ ~ _ ~ fields ~ _ ~ methods ~ _ => new SEClass(id, args, fields, methods)}) |
+      (LP ~ "define" ~ ID ~ expr ~ RP  ^^ { case _ ~ _ ~ n ~ e ~ _  => new SEdefine(n,e) }) | 
+      (LP ~ "class" ~ ID ~ LP ~ rep(ID) ~ RP ~ "," ~ rep(binding) ~ "," ~ rep(method_helper) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ args ~ _ ~ _ ~ fields ~ _ ~ methods ~ _ => new SEClass(id, args, fields, methods)}) |
       (LP ~ "class" ~ ID ~ "inherits" ~ ID ~ LP ~ rep(ID) ~ RP ~ "," ~ rep(binding) ~ "," ~ rep(binding) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ id2 ~ _ ~ args ~ _ ~ _ ~ fields ~ _ ~ methods ~ _ => new SEClassInherit(id, id2, args, fields, methods)}) |
       (expr ^^ { e => new SEexpr(e) }) |
       ("#quit" ^^ { s => new SEquit() })
@@ -923,12 +957,19 @@ class SExpParser extends RegexParsers {
 
 // (class A (String1 2) (String2 3), (Method 4))
 // (class B (String1 a) (String2 b), (Method c))
-// (class C (String1 (+ 10 20)) (String2 (+ 20 20)), (Method (+ 30 20)))
+// (class C (String1 (+ 10 20)) , (String2 (+ 20 20)) , (Method (+ 30 20)))
 // (class D inherits C (String1 hello) (String2 (* 2 2)), (Method (* 4 4)))
 // (class E inherits A (String1 hello), (Method (* 5 5)))
 
 // (method (y) (+x y))
 // (d.add(10 20))
+
+// (class Adder (x y) , (field x) , (method (z) (+ y z)))
+// (define a (new Adder (1 2)))
+// (a . field)
+// (a . method (1))
+
+// (method (x) (+y z))
 
 
 //
@@ -975,7 +1016,7 @@ class SEdefine (n:String, e:Exp) extends ShellEntry {
 
 }
 
-class SEClass (name:String, args: List[String], fields:List[(String, Exp)], methods:List[(String, Exp)]) extends ShellEntry {
+class SEClass (name:String, args: List[String], fields:List[(String, Exp)], methods:List[Exp]) extends ShellEntry {
 
    def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String,Exp)], List[(String,Exp)])]) = {
       var newClasst = classt
