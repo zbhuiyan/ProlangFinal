@@ -718,6 +718,7 @@ class EObject (val class_name: String, val args: List[Exp]) extends Exp {
          fields_val = (field._1, field._2.eval(new_env, classt)) :: fields_val
        }
      }
+    // havent implemented
     //  for (method <- values._3) {
     //    val field_val = method._2.eval(env, classt)
     //    println(field_val)
@@ -763,7 +764,7 @@ class EField (val name:String, val field:String) extends Exp {
  }
 
 // (class Adder (x y) , (field x) , (method (z) (+ y z))
-// (define a (new Adder (1 2))
+// (define a (new Adder (1 2)))
 // (a . field)
 // (a . method (1))
 
@@ -927,7 +928,7 @@ class SExpParser extends RegexParsers {
 // (class D inherits C (String1 hello) (String2 (* 2 2)), (Method (* 4 4)))
 // (class E inherits A (String1 hello), (Method (* 5 5)))
 
-// (method (y) (+x y))
+// (method (y) (+ x y))
 // (d.add(10 20))
 
 
