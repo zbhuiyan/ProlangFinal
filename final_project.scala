@@ -677,16 +677,18 @@ class EObject (val class_name: String, val args: List[Exp]) extends Exp {
        new_env = new_env.push(arguments(index), args(index).eval(env, classt))
      }
 
-     //go through the field and update the variables into values based on the parameters
+     //go through the field and evaluate values based on the parameters
      for (field <- values._2) {
        val field_val = field._2.eval(new_env, classt)
-       if (arguments.contains(field_val)) {
-         //find the index of the argument to replace
-         var index = arguments.indexOf(field_val)
-         fields_val = (field._1, args(index).eval(new_env, classt)) :: fields_val
-       } else {
-         fields_val = (field._1, field._2.eval(new_env, classt)) :: fields_val
-       }
+       fields_val = (field._1, field._2.eval(new_env, classt)) :: fields_val
+      // this part is actually not necessary
+      //  if (arguments.contains(field_val)) {
+      //    //find the index of the argument to replace
+      //    var index = arguments.indexOf(field_val)
+      //    fields_val = (field._1, args(index).eval(new_env, classt)) :: fields_val
+      //  } else {
+      //    fields_val = (field._1, field._2.eval(new_env, classt)) :: fields_val
+      //  }
      }
      //update for method as well using a similar method
      for (method <- values._3) {
@@ -852,7 +854,7 @@ class SExpParser extends RegexParsers {
 
    /* This parser allows us to have more than one method, with this structure of method name, arguments, and body. */
    def method_helper: Parser[(String, List[String], Exp)] =
-      LP ~ ID ~ LP ~ rep(ID) ~ RP ~ expr ~ RP ^^ {case _ ~ methodName ~ _ ~ input ~ _ ~ body ~ _ => new EFunction(input, TString ,body)}
+      LP ~ ID ~ LP ~ rep(ID) ~ RP ~ expr ~ RP ^^ {case _ ~ methodName ~ _ ~ input ~ _ ~ body ~ _ => (methodName, input, body)}
 
    def expr : Parser[Exp] =
       ( atomic | expr_if | expr_object | expr_field | expr_method | expr_vec | expr_fun | expr_funr | expr_let | expr_app ) ^^
