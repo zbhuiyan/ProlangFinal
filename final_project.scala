@@ -758,6 +758,7 @@ class EField (val name:String, val field:String) extends Exp {
      if (env.contains(name)) {
         val objects = env.lookup(name)
         val method = objects.lookupMethod(method_name)
+        // push the parameter and their value pairs into the environment before evaluating
         var new_env = env
         for (index <- 0 to args.length-1) {
           new_env = new_env.push(method._1(index), args(index).eval(new_env, classt))
@@ -866,7 +867,7 @@ class SExpParser extends RegexParsers {
       LP ~ ID ~ DOT ~ ID ~ RP ^^ {case _ ~ class_name ~ _ ~ field ~ _ => new EField(class_name, field)}
 
    def method_helper: Parser[(String, List[String], Exp)] =
-      LP ~ ID ~ LP ~ rep(ID) ~ RP ~ expr ~ RP ^^ {case _ ~ methodName ~ _ ~ input ~ _ ~ body ~ _ => (methodName, input, body)}
+      LP ~ ID ~ LP ~ rep(ID) ~ RP ~ expr ~ RP ^^ {case _ ~ methodName ~ _ ~ input ~ _ ~ body ~ _ => new EFunction(input, TString ,body)}
 
    // (method (x) (+y z))
 
