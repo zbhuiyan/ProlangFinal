@@ -688,8 +688,6 @@ class EObject (val class_name: String, val args: List[Exp]) extends Exp {
      var new_env = env
 
      for (index <- 0 to args.length-1) {
-      // println("arguments(index): " +  arguments(index))
-      // println("args(index): " + args(index))
        new_env = new_env.push(arguments(index), args(index).eval(env, classt))
      }
 
@@ -703,24 +701,10 @@ class EObject (val class_name: String, val args: List[Exp]) extends Exp {
          fields_val = (field._1, field._2.eval(new_env, classt)) :: fields_val
        }
      }
-    //  var closure = new EApply(new EId(1), List())
      for (method <- values._3) {
        for (index <- 0 to method._2.length-1) {
          new_env = new_env.push(method._2(index), null)
        }
-      //  var eapply = method._3.lookup()
-      //  var method_argument = List()
-      //  for (arg <- eapply._2) {
-      //    val method_val = arg.eval(new_env, classt)
-      //    if (arguments.contains(method_val)) {
-      //      var index = arguments.indexOf(method_val)
-      //      meths_val = (field._1, args(index).eval(new_env, classt)) :: fields_val
-      //    } else {
-      //      fields_val = (field._1, field._2.eval(new_env, classt)) :: fields_val
-      //    }
-        //  }
-      //  
-       //process method._3
        meths_val = (method._1, method._2, new VRecClosure("",List("this"),method._3,env,classt)) :: meths_val
      }
      return new VObject(fields_val, meths_val)
@@ -747,7 +731,6 @@ class EField (val name:String, val field:String) extends Exp {
 
    def typeOf (symt:Env[Type]) : Type = {
      return TString
-    //  return name.typeOf(symt)
    }
 
  }
@@ -872,8 +855,6 @@ class SExpParser extends RegexParsers {
    def method_helper: Parser[(String, List[String], Exp)] =
       LP ~ ID ~ LP ~ rep(ID) ~ RP ~ expr ~ RP ^^ {case _ ~ methodName ~ _ ~ input ~ _ ~ body ~ _ => (methodName, input, body)}
 
-   // (method (x) (+y z))
-
    def expr : Parser[Exp] =
       ( atomic | expr_if | expr_object | expr_field | expr_method | expr_vec | expr_fun | expr_funr | expr_let | expr_app ) ^^
            { e => e }
@@ -941,7 +922,6 @@ class SEdefine (n:String, e:Exp) extends ShellEntry {
       val t = e.typeOf(symt)
       val v = e.eval(env, classt)
       println(n + " defined with type " + t)
-      // println("v" + v)
       return (env.push(n,v),symt.push(n,t),classt)
    }
 
@@ -957,7 +937,6 @@ class SEClass (name:String, args: List[String], fields:List[(String, Exp)], meth
         newClasst = newClasst.push(name, (args, fields, methods))
         println("New Class " + name + " created: " + args + fields + methods)
       }
-      // println("Class Env!!!" + env)
       return (env,symt,newClasst)
    }
 
