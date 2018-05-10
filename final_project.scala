@@ -842,12 +842,15 @@ class SExpParser extends RegexParsers {
    def expr_object: Parser[Exp] =
       LP ~ NEW ~ ID ~ rep(expr) ~ RP ^^ {case _ ~ _ ~ id ~ args ~ _  => new EObject(id, args)}
 
+   /* This parser allows us to create a new EMethod with the method's associated class name, the method body itself, and any arguments. */
    def expr_method: Parser[Exp] =
       LP ~ ID ~ DOT ~ ID ~ rep(expr) ~ RP ^^ {case _ ~ class_name ~ _ ~ method ~ arguments ~ _ => new EMethod(class_name, method, arguments)}
 
+   /* This parser allows us to create a new EField with the field's associated class name, and the field itself. */
    def expr_field: Parser[Exp] =
       LP ~ ID ~ DOT ~ ID ~ RP ^^ {case _ ~ class_name ~ _ ~ field ~ _ => new EField(class_name, field)}
 
+   /* This parser allows us to have more than one method, with this structure of method name, arguments, and body. */
    def method_helper: Parser[(String, List[String], Exp)] =
       LP ~ ID ~ LP ~ rep(ID) ~ RP ~ expr ~ RP ^^ {case _ ~ methodName ~ _ ~ input ~ _ ~ body ~ _ => new EFunction(input, TString ,body)}
 
@@ -871,6 +874,8 @@ class SExpParser extends RegexParsers {
    def typ : Parser[Type] =
       ( typ_int | typ_bool | typ_intvec | typ_fun ) ^^ { e => e }
 
+
+   /* We added parsing for class definitions, object creation, and class inheritance. */
    def shell_entry : Parser[ShellEntry] =
       (LP ~ "define" ~ ID ~ expr ~ RP  ^^ { case _ ~ _ ~ n ~ e ~ _  => new SEdefine(n,e) }) |
       (LP ~ "class" ~ ID ~ LP ~ rep(ID) ~ RP ~ "," ~ rep(binding) ~ "," ~ rep(method_helper) ~ RP ^^ { case _ ~ _ ~ id ~ _ ~ args ~ _ ~ _ ~ fields ~ _ ~ methods ~ _ => new SEClass(id, args, fields, methods)}) |
@@ -912,6 +917,7 @@ class SEexpr (e:Exp) extends ShellEntry {
 //       table while the resulting value is added to the top-level
 //       environment
 
+/* This function allows us to create a new object of a class and it pushes the evaluated new class into the environment, and it also returns the classtable. */
 class SEdefine (n:String, e:Exp) extends ShellEntry {
 
    def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[String], List[(String,Exp)], List[(String, List[String], Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String, Exp)], List[(String, List[String], Exp)])]) = {
@@ -923,6 +929,7 @@ class SEdefine (n:String, e:Exp) extends ShellEntry {
 
 }
 
+/* This function allows us to create a new class, taking in the class name, arguments, list of fields, and list of methods. It pushes all these things into the classtable. */
 class SEClass (name:String, args: List[String], fields:List[(String, Exp)], methods:List[(String, List[String], Exp)]) extends ShellEntry {
 
    def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String, List[String], Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String, Exp)], List[(String, List[String], Exp)])]) = {
@@ -938,6 +945,8 @@ class SEClass (name:String, args: List[String], fields:List[(String, Exp)], meth
 
 }
 
+
+/* This function allows a class to inherit from another class, taking in all the parent class's fields and methods and updating (or overriding) any fields with the same name. */
 class SEClassInherit (name:String, name_parent:String, args: List[String], fields:List[(String, Exp)], methods:List[(String, List[String], Exp)]) extends ShellEntry {
 
    def processEntry (env:Env[Value], symt:Env[Type], classt:Env[(List[String], List[(String,Exp)], List[(String, List[String], Exp)])]) : (Env[Value], Env[Type], Env[(List[String], List[(String, Exp)], List[(String, List[String], Exp)])])	 = {
@@ -1096,13 +1105,16 @@ object Shell {
 }
 
 
-// example 1:
+/* Here are the examples we used during the demo! */
+
+
+// Example 1:
 // (class Adder (x y) , (field x) , (method (z) (+ z 1)))
 // (define a (new Adder 1 2))
 // (a . field)
 // (a . method 2)
 
-// example 2:
+// Example 2:
 // (class Adder2 (x y) , (field1 x) (field2 y) (field3 100), (method1 (z) (+ z 1)) (method2 (q) (* q 2)))
 // (define b (new Adder2 1 2))
 // (b . field1)
@@ -1110,14 +1122,14 @@ object Shell {
 // (b . method1 2)
 // (b . method2 2)
 
-// example 3:
+// Example 3:
 // (class Adder1Child inherits Adder (a b) , (field a) , (method2 (r) (+ r 1)))
 // (define c (new Adder1Child 3 4))
 // (c . field)
 // (c . method2 3)
 
 
-// example 4:
+// Example 4:
 // (class Adder2Child inherits Adder2 (x y) , (field1 77) (field3 y), (method1 (r) (+ r 5)))
 // (define d (new Adder2Child 10 20))
 // (d . field3)
