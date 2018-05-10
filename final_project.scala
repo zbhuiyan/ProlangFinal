@@ -964,6 +964,7 @@ class SEClassInherit (name:String, name_parent:String, args: List[String], field
       var new_fields = List[(String, Exp)]()
       var new_methods = List[(String, List[String], Exp)]()
 
+      // check duplicate in fields in child and parents
       for ((s_parent, e_parent) <- fields_parent) {
         var flag = 0
         for ((s_child, e_child) <- fields) {
@@ -981,6 +982,7 @@ class SEClassInherit (name:String, name_parent:String, args: List[String], field
           new_fields = (s_child, e_child) :: new_fields
       }
 
+      // check duplicate in methods in child and parents
       for ((s_parent, arg_parent, e_parent) <- methods_parent) {
         var flag = 0
         for ((s_child, arg_child, e_child) <- methods) {
@@ -1074,6 +1076,7 @@ object Shell {
      ("cons",new TFunction(List(TInteger,TIntVector),TIntVector))
    ))
 
+  //  create class table that uses env. takes a list of arguments, a list of fields and a list of methods
    val stdClasst = new Env[(List[String], List[(String,Exp)], List[(String, List[String], Exp)])](List())
 
 
