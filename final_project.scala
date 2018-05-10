@@ -1,8 +1,9 @@
-//
-// language FUNC with (simple) static types
-//
-// changes annotated with TYPE:
+// Final Project - Class and objects
 
+// Team members: Mojia Shen and Zarin Bhuiyan
+// Emails: mshen2@wellesley.edu, zarin.bhuiyan@students.olin.edu
+
+// adapted fundational code from lecture
 
 //
 //  Values
@@ -11,10 +12,6 @@
 
 abstract class Value {
 
-
-   // TYPE: removed predicates for checking types (all done statically now)
-
-   // TYPE: doesn't matter -- type system will ensure these never happens...
    def getInt () : Int = 0
    def getBool () : Boolean = false
    def getString () : String = ""
@@ -46,6 +43,7 @@ abstract class Value {
       error("Value not of type OBJECT")
    }
 
+// changed this to take a list of parameters
    def lookupMethod (s:String) : (List[String],Value) = {
       error("Value not of type OBJECT")
    }
@@ -165,12 +163,6 @@ object Ops {
        throw new Exception("Runtime error: "+msg)
    }
 
-   // TYPE: All operations simplify because:
-   //       - we don't need to check the types of values
-   //       - we don't have overloading of operations
-   //         over multiple types of values -- we need
-   //         to choose one :/
-
    def operPlus (vs:List[Value]) : Value = {
 
       val v1 = vs(0)
@@ -243,13 +235,9 @@ object Ops {
 }
 
 
-
-
 //
 //  Types
 //
-
-// TYPE: new class for types
 
 abstract class Type {
 
@@ -257,9 +245,11 @@ abstract class Type {
 
    def isInteger () : Boolean = return false
    def isBoolean () : Boolean = return false
+  //  added isString
    def isString () : Boolean = return false
    def isIntVector () : Boolean = return false
    def isFunction () : Boolean = return false
+  //  added isObject
    def isObject () : Boolean = return false
 
    def funParams () : List[Type] = {
@@ -289,6 +279,7 @@ object TBoolean extends Type {
    override def isBoolean () : Boolean = true
 }
 
+// added TString
 object TString extends Type {
 
    override def toString () : String = "string"
@@ -305,12 +296,12 @@ object TIntVector extends Type {
    override def isIntVector () : Boolean = true
 }
 
+// added TObject
 class TObject (val class_name:String) extends Type {
 
    override def toString () : String = "(class " + class_name + ")"
    def isSame (t:Type):Boolean = return t.isObject()
    override def isObject () : Boolean = true
-  //  override def getClass () : String = return class_name
 
 }
 
@@ -346,12 +337,6 @@ class TFunction (val params:List[Type], val result:Type) extends Type {
 //  Expressions
 //
 
-
-// TYPE: Env now parameterized by the type of things associated
-//       with identifiers :
-//         - values for environments (during evaluation),
-//         - types for symbol tables (during type checking)
-
 class Env[A] (val content: List[(String, A)]) {
 
       override def toString () : String = {
@@ -364,13 +349,11 @@ class Env[A] (val content: List[(String, A)]) {
 
 
       // push a single binding (id,v) on top of the environment
-
       def push (id : String, v : A) : Env[A] =
           new Env[A]((id,v)::content)
 
 
       // lookup value for an identifier in the environment
-
       def lookup (id : String) : A = {
       	  for (entry <- content) {
   	      if (entry._1 == id) {
@@ -380,6 +363,7 @@ class Env[A] (val content: List[(String, A)]) {
 	        throw new Exception("Environment error: unbound identifier "+id)
       }
 
+      // contains returns boolean to check if the string is in the environment
       def contains(id: String) : Boolean = {
         for (entry <- content) {
           if (entry._1 == id) {
@@ -403,9 +387,6 @@ abstract class Exp {
     def terror (msg : String) : Nothing = {
        throw new Exception("Type error: "+ msg + "\n   in expression " + this)
     }
-
-    // TYPE: new methods for type checking
-    //       implemented in every subclass of Exp
 
     def typeOf (symt:Env[Type]) : Type
 
@@ -444,6 +425,7 @@ class EBoolean (val b:Boolean) extends Exp {
         TBoolean
 }
 
+// created String representation
 class EString (val s:String) extends Exp {
     // string literal
 
@@ -459,7 +441,6 @@ class EString (val s:String) extends Exp {
 
 
 class EVector (val es: List[Exp]) extends Exp {
-    // Vectors
 
    override def toString () : String =
       "EVector" + es.addString(new StringBuilder(),"(", " ", ")").toString()
@@ -650,7 +631,7 @@ class ELet (val bindings : List[(String,Exp)], val ebody : Exp) extends Exp {
  * OBJECTS
  *
  */
-
+// VObject takes a list of fields and methods
 class VObject (val fields: List[(String,Value)], val methods:List[(String, List[String], Value)]) extends Value {
 
   override def toString () : String = "object(" + fields + "," + methods + ")"
@@ -665,6 +646,7 @@ class VObject (val fields: List[(String,Value)], val methods:List[(String, List[
      error("No field "+s+" in object")
   }
 
+// return a list of arguments and values of the method
   override def lookupMethod (s:String) : (List[String],Value) = {
      for ((n,a,v) <- methods) {
        if (n == s) {
@@ -675,53 +657,63 @@ class VObject (val fields: List[(String,Value)], val methods:List[(String, List[
   }
 }
 
+// EObject takes a class name and a list of arguments
 class EObject (val class_name: String, val args: List[Exp]) extends Exp {
 
    override def toString () : String =
      "EObject(" + class_name + ", " + args + ")"
 
+// takes environment and class table, and return VObject
    def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, List[String], Exp)])]) : Value = {
+    //  look up through class name in class table
      val values = classt.lookup(class_name)
-     val arguments = values._1
+     val arguments = values._1 // a list of parameters of the class
      var fields_val = List[(String, Value)]()
      var meths_val = List[(String, List[String], Value)]()
-     var new_env = env
 
+    // add all the parameters with their values to the environment before eval
+     var new_env = env
      for (index <- 0 to args.length-1) {
        new_env = new_env.push(arguments(index), args(index).eval(env, classt))
      }
 
+     //go through the field and update the variables into values based on the parameters
      for (field <- values._2) {
        val field_val = field._2.eval(new_env, classt)
        if (arguments.contains(field_val)) {
-         println("matched in field")
+         //find the index of the argument to replace
          var index = arguments.indexOf(field_val)
          fields_val = (field._1, args(index).eval(new_env, classt)) :: fields_val
        } else {
          fields_val = (field._1, field._2.eval(new_env, classt)) :: fields_val
        }
      }
+     //update for method as well using a similar method
      for (method <- values._3) {
        for (index <- 0 to method._2.length-1) {
          new_env = new_env.push(method._2(index), null)
        }
        meths_val = (method._1, method._2, new VRecClosure("",List("this"),method._3,env,classt)) :: meths_val
      }
+    //  create new VObject with a list of evaluated fields and methods
      return new VObject(fields_val, meths_val)
    }
-
+  //  created type TObject based on class name. we only have type for objects, not class
    def typeOf (symt:Env[Type]) : Type =
      new TObject(class_name)
 }
 
+// created EField that takes name of the object and name of the field
 class EField (val name:String, val field:String) extends Exp {
 
    override def toString () : String =
       "EField(" + name + "," + field + ")"
 
    def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, List[String], Exp)])]) : Value = {
+    //  find object in the environment
      if (env.contains(name)) {
        val value = env.lookup(name)
+       // find field based on name
        val result = value.lookupField(field)
        return result
      } else {
@@ -735,23 +727,26 @@ class EField (val name:String, val field:String) extends Exp {
 
  }
 
-
+// EMethod takes name of the object, name of the method and a list of arguments for the method
  class EMethod (val name:String, val method_name:String, val args:List[Exp]) extends Exp {
 
    override def toString () : String =
       "EMethod(" + name + "," + method_name + ")"
 
    def eval (env : Env[Value], classt : Env[(List[String], List[(String, Exp)], List[(String, List[String], Exp)])]) : Value = {
+    //  look up the object in env
      if (env.contains(name)) {
         val objects = env.lookup(name)
+        // look up method in the object
         val method = objects.lookupMethod(method_name)
+
         // push the parameter and their value pairs into the environment before evaluating
         var new_env = env
         for (index <- 0 to args.length-1) {
           new_env = new_env.push(method._1(index), args(index).eval(new_env, classt))
         }
         val new_args = args.map(p => p.eval(new_env, classt))
-
+        // evaluate the method to a value
         return method._2.apply(new_args,new_env)
       } else {
         error("No method" + method_name + " found")
@@ -759,6 +754,7 @@ class EField (val name:String, val field:String) extends Exp {
 
    }
 
+// we didnt create new type of the method, so simply return TString. We might consider changing this to the value of the method function
    def typeOf(symt:Env[Type]) : Type = {
      return TString
     //  return name.typeOf(symt)
@@ -768,8 +764,6 @@ class EField (val name:String, val field:String) extends Exp {
 //
 // SURFACE SYNTAX (S-expressions)
 //
-
-
 import scala.util.parsing.combinator._
 
 
@@ -789,8 +783,9 @@ class SExpParser extends RegexParsers {
    def STRING : Parser[String] = """\".*\"""".r ^^ { s => s }
    def FUN : Parser[Unit] = "fun" ^^ { s => () }
    def LET : Parser[Unit] = "let" ^^ { s => () }
-   def NEW : Parser[Unit] = "new" ^^ { s => () }
 
+  //  created new keywords
+   def NEW : Parser[Unit] = "new" ^^ { s => () }
    def CLASS : Parser[Unit] = "class" ^^ { s => () }
    def FIELDS : Parser[Unit] = "fields" ^^ { s => () }
    def METHODS : Parser[Unit] = "methods" ^^ { s => () }
@@ -900,7 +895,7 @@ abstract class ShellEntry {
 // TYPE: entering an expression in the shell first type-checks it
 //       and the resulting type is printed alongside the
 //       result of the evaluation
- 
+
 class SEexpr (e:Exp) extends ShellEntry {
 
    def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[String], List[(String,Exp)], List[(String, List[String], Exp)])]) : (Env[Value],Env[Type],Env[(List[String], List[(String,Exp)], List[(String, List[String], Exp)])]) = {
