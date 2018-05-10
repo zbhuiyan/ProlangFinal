@@ -686,9 +686,11 @@ class EObject (val class_name: String, val args: List[Exp]) extends Exp {
      var fields_val = List[(String, Value)]()
      var meths_val = List[(String, List[String], Value)]()
      var new_env = env
+
      for (index <- 0 to args.length-1) {
        new_env = new_env.push(arguments(index), args(index).eval(env, classt))
      }
+
      for (field <- values._2) {
        val field_val = field._2.eval(new_env, classt)
        if (arguments.contains(field_val)) {
@@ -699,24 +701,10 @@ class EObject (val class_name: String, val args: List[Exp]) extends Exp {
          fields_val = (field._1, field._2.eval(new_env, classt)) :: fields_val
        }
      }
-    //  var closure = new EApply(new EId(1), List())
      for (method <- values._3) {
        for (index <- 0 to method._2.length-1) {
          new_env = new_env.push(method._2(index), null)
        }
-      //  var eapply = method._3.lookup()
-      //  var method_argument = List()
-      //  for (arg <- eapply._2) {
-      //    val method_val = arg.eval(new_env, classt)
-      //    if (arguments.contains(method_val)) {
-      //      var index = arguments.indexOf(method_val)
-      //      meths_val = (field._1, args(index).eval(new_env, classt)) :: fields_val
-      //    } else {
-      //      fields_val = (field._1, field._2.eval(new_env, classt)) :: fields_val
-      //    }
-        //  }
-      //  }
-       //process method._3
        meths_val = (method._1, method._2, new VRecClosure("",List("this"),method._3,env,classt)) :: meths_val
      }
      return new VObject(fields_val, meths_val)
@@ -743,7 +731,6 @@ class EField (val name:String, val field:String) extends Exp {
 
    def typeOf (symt:Env[Type]) : Type = {
      return TString
-    //  return name.typeOf(symt)
    }
 
  }
@@ -869,8 +856,6 @@ class SExpParser extends RegexParsers {
    def method_helper: Parser[(String, List[String], Exp)] =
       LP ~ ID ~ LP ~ rep(ID) ~ RP ~ expr ~ RP ^^ {case _ ~ methodName ~ _ ~ input ~ _ ~ body ~ _ => new EFunction(input, TString ,body)}
 
-   // (method (x) (+y z))
-
    def expr : Parser[Exp] =
       ( atomic | expr_if | expr_object | expr_field | expr_method | expr_vec | expr_fun | expr_funr | expr_let | expr_app ) ^^
            { e => e }
@@ -915,7 +900,7 @@ abstract class ShellEntry {
 // TYPE: entering an expression in the shell first type-checks it
 //       and the resulting type is printed alongside the
 //       result of the evaluation
-
+ 
 class SEexpr (e:Exp) extends ShellEntry {
 
    def processEntry (env:Env[Value],symt:Env[Type],classt:Env[(List[String], List[(String,Exp)], List[(String, List[String], Exp)])]) : (Env[Value],Env[Type],Env[(List[String], List[(String,Exp)], List[(String, List[String], Exp)])]) = {
@@ -953,7 +938,6 @@ class SEClass (name:String, args: List[String], fields:List[(String, Exp)], meth
         newClasst = newClasst.push(name, (args, fields, methods))
         println("New Class " + name + " created: " + args + fields + methods)
       }
-
       return (env,symt,newClasst)
    }
 
@@ -1121,7 +1105,7 @@ object Shell {
 // (class Adder (x y) , (field x) , (method (z) (+ z 1)))
 // (define a (new Adder 1 2))
 // (a . field)
-// (a . method (2))
+// (a . method 2)
 
 // example 2:
 // (class Adder2 (x y) , (field1 x) (field2 y) (field3 100), (method1 (z) (+ z 1)) (method2 (q) (* q 2)))
@@ -1130,3 +1114,18 @@ object Shell {
 // (b . field2)
 // (b . method1 2)
 // (b . method2 2)
+
+// example 3:
+// (class Adder1Child inherits Adder (a b) , (field a) , (method2 (r) (+ r 1)))
+// (define c (new Adder1Child 3 4))
+// (c . field)
+// (c . method2 3)
+
+
+// example 4:
+// (class Adder2Child inherits Adder2 (x y) , (field1 77) (field3 y), (method1 (r) (+ r 5)))
+// (define d (new Adder2Child 10 20))
+// (d . field3)
+// (d . field2)
+// (d . method1 5)
+// (d . method2 50)
